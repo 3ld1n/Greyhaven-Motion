@@ -690,39 +690,41 @@ export function createMissionaryRenderer(canvas) {
             const openY = E.y + 2.02;
             const contactOpen = Math.max(0, Math.min(1, motionContact * 1.15));
             const rimY = openY - 0.02;
-            const foldTopY = openY - (1.06 + openH * 0.42);
-            const foldBottomY = openY - 0.28;
+            const foldTopY = openY - (1.12 + openH * 0.46);
+            const bridgeBottomY = rimY - Math.max(0.28, openH * 0.48);
+            const bridgeOuterY = rimY - Math.max(0.08, openH * 0.18);
 
-            // Upper skin bridge/fold. It sits ABOVE the rim and covers the gap area; no tan band should appear below the rim.
+            // Upper skin bridge/fold. It sits fully ABOVE the rim and acts as the top mask.
+            // This prevents the shaft from showing past the rim and removes the tan band under it.
             ctx.beginPath();
-            ctx.moveTo(E.x - openW - 0.25, foldBottomY);
-            ctx.quadraticCurveTo(E.x - openW * 0.84, foldTopY + 0.10, E.x, foldTopY - 0.22);
-            ctx.quadraticCurveTo(E.x + openW * 0.84, foldTopY + 0.10, E.x + openW + 0.25, foldBottomY);
-            ctx.lineTo(E.x + openW * 0.70, foldBottomY - 0.02);
-            ctx.quadraticCurveTo(E.x, foldBottomY - 0.16, E.x - openW * 0.70, foldBottomY - 0.02);
+            ctx.moveTo(E.x - openW - 0.30, bridgeOuterY);
+            ctx.quadraticCurveTo(E.x - openW * 0.86, foldTopY + 0.10, E.x, foldTopY - 0.24);
+            ctx.quadraticCurveTo(E.x + openW * 0.86, foldTopY + 0.10, E.x + openW + 0.30, bridgeOuterY);
+            ctx.lineTo(E.x + openW * 0.82, bridgeBottomY + 0.02);
+            ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.14, E.x - openW * 0.82, bridgeBottomY + 0.02);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
 
-            // Extra occlusion inside the opening so the shaft fully disappears right at the rim, even near 150% depth.
+            // Fill the hidden pocket behind the rim so the shaft vanishes exactly at the rim line.
             if (contactOpen > 0.04) {
                 ctx.beginPath();
-                ctx.moveTo(E.x - openW * 0.78, rimY + 0.05);
-                ctx.quadraticCurveTo(E.x, rimY - 0.10, E.x + openW * 0.78, rimY + 0.05);
-                ctx.quadraticCurveTo(E.x + openW * 0.58, openY + 0.44, E.x, openY + 0.48);
-                ctx.quadraticCurveTo(E.x - openW * 0.58, openY + 0.44, E.x - openW * 0.78, rimY + 0.05);
+                ctx.moveTo(E.x - openW * 0.86, rimY + 0.02);
+                ctx.quadraticCurveTo(E.x, rimY - 0.06, E.x + openW * 0.86, rimY + 0.02);
+                ctx.lineTo(E.x + openW * 0.62, bridgeBottomY + 0.04);
+                ctx.quadraticCurveTo(E.x, bridgeBottomY + 0.10, E.x - openW * 0.62, bridgeBottomY + 0.04);
                 ctx.closePath();
-                ctx.fillStyle = 'rgba(78, 36, 48, 0.36)';
+                ctx.fillStyle = 'rgba(78, 36, 48, 0.34)';
                 ctx.fill();
             }
 
             // Subtle inner crease hints live above the fold cover; keep the outer slivers gone.
             for (const m of [1, -1]) {
                 ctx.beginPath();
-                ctx.moveTo(E.x + m * (openW * 0.86), openY - 0.90);
-                ctx.quadraticCurveTo(E.x + m * (openW * 0.64), openY - 0.58, E.x + m * (openW * 0.54), openY - 0.06);
-                ctx.strokeStyle = 'rgba(148, 88, 98, 0.28)';
-                ctx.lineWidth = 0.48;
+                ctx.moveTo(E.x + m * (openW * 0.78), openY - 0.96);
+                ctx.quadraticCurveTo(E.x + m * (openW * 0.60), openY - 0.64, E.x + m * (openW * 0.50), bridgeBottomY + 0.06);
+                ctx.strokeStyle = 'rgba(148, 88, 98, 0.24)';
+                ctx.lineWidth = 0.44;
                 ctx.stroke();
             }
 
@@ -731,7 +733,7 @@ export function createMissionaryRenderer(canvas) {
                 ctx.beginPath();
                 ctx.ellipse(E.x, rimY, openW, openH, 0, Math.PI, 0);
                 ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-                ctx.lineWidth = 1.24;
+                ctx.lineWidth = 1.26;
                 ctx.stroke();
             }
 
