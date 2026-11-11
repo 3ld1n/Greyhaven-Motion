@@ -34,6 +34,7 @@ export function createSim(userOpts = {}) {
         maxDepthPct: 150,       // pierced depth ceiling, 100..150 (% of her natural depth)
         canalLength: 1.0,       // vaginal length multiplier (0.7 shallow .. 1.2 deep); scales
                                 // her anatomy about the entrance, penis inches stay absolute
+        protection: false,      // if on, ejaculation is visually contained instead of filling the canal
     }, userOpts);
 
     const cl = opts.centerline || CENTERLINES.side;
@@ -260,8 +261,10 @@ export function createSim(userOpts = {}) {
         st.hymenOver = 0; // release resets all overstretch progress
         st.cervixOver = 0;
         st.wombOver = 0;
-        const where = (st.pierce && st.d > L + 1.5) ? 'womb' : 'vagina';
-        if (where === 'womb') st.cum.wombCount++; else st.cum.vagCount++;
+        const where = opts.protection ? 'protected' : ((st.pierce && st.d > L + 1.5) ? 'womb' : 'vagina');
+        if (where === 'womb') st.cum.wombCount++;
+        else if (where === 'vagina') st.cum.vagCount++;
+        else st.cum.condomCount++;
         // a couple of body shudders
         st.jig.vx += stations[0].tan.x * 8 * opts.jiggleScale;
         st.jig.vy += stations[0].tan.y * 8 * opts.jiggleScale;
@@ -269,7 +272,7 @@ export function createSim(userOpts = {}) {
     }
 
     function resetFluids() {
-        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0 };
+        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0 };
     }
 
     function step(dt) {
@@ -618,35 +621,44 @@ export function createSim(userOpts = {}) {
             let done = false;
             // a sealed hymen blocks fluid too: cum pools in the small
             // vestibule before the membrane and can't go further
-            if (st.hymen.present && p.a > 2.4 + st.hymen.stretch) {
-                cum.vag = Math.min(0.35, cum.vag + 0.03);
-                cum.particles.splice(i, 1);
-                continue;
-            }
-            if (p.womb) {
-                // ~0.75 per load; the cap is configurable up to 10x capacity
-                if (p.a > L + 3.5) { cum.womb = Math.min(opts.wombCapacity, cum.womb + 0.018); done = true; }
-            } else if (p.a > L - 0.6 || p.v < 3) {
-                // ~0.9 per load, cap 1.8
-                cum.vag = Math.min(1.8, cum.vag + 0.022); done = true;
-                st.loose = Math.min(1, st.loose + 0.0035); // cum is lube
+            if (opts.protection) {
+                if (p.a > 1.1 || p.v < 3) {
+                    cum.condom = Math.min(1.35, (cum.condom || 0) + 0.022);
+                    done = true;
+                }
+            } else {
+                if (st.hymen.present && p.a > 2.4 + st.hymen.stretch) {
+                    cum.vag = Math.min(0.35, cum.vag + 0.03);
+                    cum.particles.splice(i, 1);
+                    continue;
+                }
+                if (p.womb) {
+                    // ~0.75 per load; the cap is configurable up to 10x capacity
+                    if (p.a > L + 3.5) { cum.womb = Math.min(opts.wombCapacity, cum.womb + 0.018); done = true; }
+                } else if (p.a > L - 0.6 || p.v < 3) {
+                    // ~0.9 per load, cap 1.8
+                    cum.vag = Math.min(1.8, cum.vag + 0.022); done = true;
+                    st.loose = Math.min(1, st.loose + 0.0035); // cum is lube
+                }
             }
             if (done) cum.particles.splice(i, 1);
         }
         // a full vagina seeps a little through the cervix — and even an
         // intact hymen lets a thin trickle past (~3% womb per load, slowly)
-        if (st.hymen.present) {
-            const seepCap = Math.min(0.12, 0.03 * cum.vagCount);
-            if (cum.vag > 0.15 && cum.womb < seepCap) cum.womb = Math.min(seepCap, cum.womb + dt * 0.004);
-        } else if (cum.vag > 0.55 && cum.womb < 0.3) {
-            cum.womb = Math.min(0.3, cum.womb + dt * 0.012);
+        if (!opts.protection) {
+            if (st.hymen.present) {
+                const seepCap = Math.min(0.12, 0.03 * cum.vagCount);
+                if (cum.vag > 0.15 && cum.womb < seepCap) cum.womb = Math.min(seepCap, cum.womb + dt * 0.004);
+            } else if (cum.vag > 0.55 && cum.womb < 0.3) {
+                cum.womb = Math.min(0.3, cum.womb + dt * 0.012);
+            }
+            // ...an overfilled womb backflows out through the cervix...
+            if (cum.womb > 1.15) cum.vag = Math.min(1.8, cum.vag + dt * 0.06);
         }
-        // ...an overfilled womb backflows out through the cervix...
-        if (cum.womb > 1.15) cum.vag = Math.min(1.8, cum.vag + dt * 0.06);
         // ...and an overfilled vagina leaks out of the entrance
-        const leakTarget = st.hymen.present
+        const leakTarget = opts.protection ? 0 : (st.hymen.present
             ? Math.max(0, Math.min(1, (cum.vag - 0.12) * 3.5)) // tiny vestibule overflows readily
-            : Math.max(0, Math.min(1, (cum.vag - 0.6) * 1.6));
+            : Math.max(0, Math.min(1, (cum.vag - 0.6) * 1.6)));
         cum.leak += (leakTarget - cum.leak) * Math.min(1, dt * 2);
         if (cum.leak > 0.3) cum.vag = Math.max(0, cum.vag - dt * 0.012); // slow drain while leaking
 

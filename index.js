@@ -40,6 +40,7 @@ const defaultSettings = {
   previewOpen: false,
   actionPreamble: DEFAULT_ACTION_PREAMBLE,
   styleGuide: DEFAULT_STYLE_GUIDE,
+  activeTab: 'actions',
 };
 
 function settings() {
@@ -66,6 +67,7 @@ const session = {
   lastDepth: 0,
   cumVag: 0,
   cumWomb: 0,
+  cumProtected: 0,
   cervixPierced: false,
   cervixBreached: false,
   wombBreached: false,
@@ -94,6 +96,7 @@ function resetSession() {
   session.lastDepth = 0;
   session.cumVag = 0;
   session.cumWomb = 0;
+  session.cumProtected = 0;
   session.cervixPierced = false;
   session.cervixBreached = false;
   session.wombBreached = false;
@@ -205,7 +208,7 @@ function toggleRecord() {
   recordMode = !recordMode;
   const btn = $('#ghmotion_record');
   btn.toggleClass('ghmotion-on', recordMode);
-  btn.text(recordMode ? '⏹ Stop' : '⏺ Record');
+  btn.text(recordMode ? 'Stop' : 'Record');
   if (recordMode) {
     resetSession();
     session.active = true;
@@ -305,6 +308,7 @@ function initGame() {
     virgin: s.virginMode,
     blood: true,
     wombCapacity: 3,
+    protection: s.protection,
     penisInches: cmToInches(s.penisCm),
     maxDepthPct: s.maxDepthPct,
     canalLength: s.canalLength,
@@ -344,7 +348,7 @@ function initGame() {
   sim.on('insert', e => { touchSession(); if (!session.firstEntry) session.firstEntry = { speed: e.speed }; });
   sim.on('withdraw', () => { if (session.active) session.fullWithdrawals++; });
   sim.on('outstroke', e => { touchSession(); session.outStrokes.push(e); });
-  sim.on('cum', e => { touchSession(); if (e.where === 'womb') session.cumWomb++; else session.cumVag++; updateStatus(); });
+  sim.on('cum', e => { touchSession(); if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++; updateStatus(); });
   sim.on('cervix_pop', () => { touchSession(); session.cervixPierced = true; });
   sim.on('cervix_breach', () => { touchSession(); session.cervixBreached = true; });
   sim.on('womb_breach', () => { touchSession(); session.wombBreached = true; });
@@ -410,36 +414,56 @@ jQuery(() => {
         <button class="ghmotion-icon" id="ghmotion_close" title="Close">✕</button>
       </div>
       <div id="ghmotion_canvas_wrap"><canvas id="ghmotion_canvas"></canvas></div>
-      <div id="ghmotion_controls">
-        <button class="menu_button" id="ghmotion_record">⏺ Record</button>
-        <button class="menu_button" id="ghmotion_cum">💦 Cum</button>
-        <button class="menu_button" id="ghmotion_break">💥 Break</button>
-        <button class="menu_button" id="ghmotion_womb">↧ Womb</button>
-        <button class="menu_button" id="ghmotion_preview_toggle">Summary</button>
-        <button class="menu_button" id="ghmotion_reset">Reset</button>
+      <div id="ghmotion_tabs">
+        <button class="ghmotion-tab" data-tab="actions">Actions</button>
+        <button class="ghmotion-tab" data-tab="scene">Scene</button>
+        <button class="ghmotion-tab" data-tab="prompt">Prompt</button>
       </div>
-      <div id="ghmotion_quick">
-        <label><input id="ghmotion_xray" type="checkbox"> X-ray</label>
-        <label><input id="ghmotion_protection" type="checkbox"> Protection</label>
-        <label><input id="ghmotion_virgin" type="checkbox"> Virgin</label>
-        <label>Size <input id="ghmotion_size" type="number" min="8" max="30" step="0.5"> cm</label>
-        <label>Depth <input id="ghmotion_depth" type="number" min="100" max="150" step="5"> %</label>
-        <label>Tight <input id="ghmotion_tight" type="number" min="0.5" max="2" step="0.1"></label>
-        <label>Canal <input id="ghmotion_canal" type="number" min="0.5" max="3" step="0.1"></label>
-        <label>Len <input id="ghmotion_len" type="number" min="0.7" max="1.2" step="0.05"></label>
-        <label>Her <select id="ghmotion_her"></select></label>
-        <label>His <select id="ghmotion_him"></select></label>
-      </div>
-      <div id="ghmotion_preview" style="display:${s.previewOpen ? 'block' : 'none'};">
-        <div class="ghmotion-preview-head">
-          <span>Hidden summary for the next send</span>
-          <button class="menu_button" id="ghmotion_clear">Clear staged</button>
+      <div id="ghmotion_tab_actions" class="ghmotion-tab-panel">
+        <div id="ghmotion_controls">
+          <button class="menu_button" id="ghmotion_record">Record</button>
+          <button class="menu_button" id="ghmotion_cum">Finish</button>
+          <button class="menu_button" id="ghmotion_break">Break</button>
+          <button class="menu_button" id="ghmotion_womb">Womb</button>
+          <button class="menu_button" id="ghmotion_preview_toggle">Prompt</button>
+          <button class="menu_button" id="ghmotion_reset">Reset</button>
         </div>
-        <textarea id="ghmotion_summary" class="text_pole" rows="8" placeholder="Your hidden summary will appear here after you stop recording."></textarea>
-        <div class="ghmotion-help">This text stays hidden from the chat box and rides along only with your next sent message. It clears automatically after the reply is generated.</div>
+      </div>
+      <div id="ghmotion_tab_scene" class="ghmotion-tab-panel">
+        <div id="ghmotion_quick">
+          <label><span>X-ray</span><input id="ghmotion_xray" type="checkbox"></label>
+          <label><span>Protection</span><input id="ghmotion_protection" type="checkbox"></label>
+          <label><span>Virgin</span><input id="ghmotion_virgin" type="checkbox"></label>
+          <label><span>Size</span><input id="ghmotion_size" type="number" min="8" max="30" step="0.5"> <span>cm</span></label>
+          <label><span>Depth</span><input id="ghmotion_depth" type="number" min="100" max="150" step="5"> <span>%</span></label>
+          <label><span>Tight</span><input id="ghmotion_tight" type="number" min="0.5" max="2" step="0.1"></label>
+          <label><span>Canal</span><input id="ghmotion_canal" type="number" min="0.5" max="3" step="0.1"></label>
+          <label><span>Len</span><input id="ghmotion_len" type="number" min="0.7" max="1.2" step="0.05"></label>
+          <label><span>Her</span><select id="ghmotion_her"></select></label>
+          <label><span>His</span><select id="ghmotion_him"></select></label>
+        </div>
+      </div>
+      <div id="ghmotion_tab_prompt" class="ghmotion-tab-panel">
+        <div id="ghmotion_preview" style="display:block;">
+          <div class="ghmotion-preview-head">
+            <span>Hidden summary for the next send</span>
+            <button class="menu_button" id="ghmotion_clear">Clear staged</button>
+          </div>
+          <textarea id="ghmotion_summary" class="text_pole" rows="8" placeholder="Your hidden summary will appear here after you stop recording."></textarea>
+          <div class="ghmotion-help">This text stays hidden from the chat box and rides along only with your next sent message. It clears automatically after the reply is generated.</div>
+        </div>
       </div>
     </div>
   `);
+
+  function activateTab(tab) {
+    s.activeTab = tab;
+    $('.ghmotion-tab').removeClass('active');
+    $(`.ghmotion-tab[data-tab="${tab}"]`).addClass('active');
+    $('.ghmotion-tab-panel').removeClass('active');
+    $(`#ghmotion_tab_${tab}`).addClass('active');
+    saveSettingsDebounced();
+  }
 
   $('#extensionsMenu').append(`
     <div id="ghmotion_menu_item" class="list-group-item flex-container flexGap5 interactable" tabindex="0">
@@ -449,6 +473,8 @@ jQuery(() => {
 
   $('#ghmotion_menu_item').on('click', togglePanel);
   $('#ghmotion_close').on('click', togglePanel);
+  $('.ghmotion-tab').on('click', function () { activateTab($(this).data('tab')); });
+  activateTab(s.activeTab || 'actions');
 
   $('#ghmotion_xray').prop('checked', s.xrayMode).on('change', function () {
     s.xrayMode = this.checked;
@@ -458,6 +484,7 @@ jQuery(() => {
   $('#ghmotion_protection').prop('checked', s.protection).on('change', function () {
     s.protection = this.checked;
     renderer?.setProtection?.(s.protection);
+    sim?.setOptions?.({ protection: s.protection });
     if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary').value);
     saveSettingsDebounced();
   });
@@ -516,9 +543,7 @@ jQuery(() => {
   $('#ghmotion_reset').on('click', resetSceneCompletely);
   $('#ghmotion_clear').on('click', clearStagedPrompt);
   $('#ghmotion_preview_toggle').on('click', () => {
-    s.previewOpen = !s.previewOpen;
-    $('#ghmotion_preview').toggle(s.previewOpen);
-    saveSettingsDebounced();
+    activateTab('prompt');
   });
   $('#ghmotion_summary').on('input', function () {
     if (this.value.trim()) stagePrompt(this.value);

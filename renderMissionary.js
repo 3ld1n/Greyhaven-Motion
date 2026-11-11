@@ -102,16 +102,16 @@ export function createMissionaryRenderer(canvas) {
     function torsoPath(bulge = 0) {
         const b = bulge;
         ctx.beginPath();
-        ctx.moveTo(36.5 - b * 0.5, -1);
-        ctx.quadraticCurveTo(37.5 - b, 7, 38.5 - b, 14);       // slight waist
-        ctx.quadraticCurveTo(36.5 - b, 20, 35.5 - b * 0.7, 26); // widens a little at the navel
-        ctx.quadraticCurveTo(35, 33, 35.5, 40);                 // nearly straight down
-        ctx.lineTo(36, 52);                                     // hidden behind the thighs
-        ctx.lineTo(63.5, 52);
-        ctx.lineTo(64, 40);
-        ctx.quadraticCurveTo(64.5, 33, 64 + b * 0.7, 26);
-        ctx.quadraticCurveTo(63 + b, 20, 61 + b, 14);
-        ctx.quadraticCurveTo(62 + b, 7, 63 + b * 0.5, -1);
+        ctx.moveTo(36.7 - b * 0.45, -10);
+        ctx.quadraticCurveTo(37.2 - b * 0.8, -1.5, 38.4 - b * 0.95, 10.5);
+        ctx.quadraticCurveTo(36.7 - b, 18.5, 35.5 - b * 0.72, 25.5);
+        ctx.quadraticCurveTo(35.0, 33.2, 35.6, 40.5);
+        ctx.lineTo(36.0, 52.4);
+        ctx.lineTo(63.4, 52.4);
+        ctx.lineTo(64.0, 40.5);
+        ctx.quadraticCurveTo(64.6, 33.2, 64 + b * 0.72, 25.5);
+        ctx.quadraticCurveTo(62.8 + b, 18.5, 61.1 + b * 0.95, 10.5);
+        ctx.quadraticCurveTo(62.1 + b * 0.75, -1.5, 63.0 + b * 0.45, -10);
         ctx.closePath();
     }
 
@@ -168,16 +168,20 @@ export function createMissionaryRenderer(canvas) {
         };
         const wombFill = s.cum.womb;
         const pierced = s.pierce && s.d > L + 0.5;
+        const pelvisSway = Math.max(-0.8, Math.min(0.8, s.jig.x * 0.35 + s.dVel * 0.012));
+        const pelvisBounce = Math.max(-1.2, Math.min(1.2, s.jig.y * 0.35 + s.dVel * 0.018));
+        const thighPulse = Math.max(-1.5, Math.min(1.5, s.dVel * 0.028));
+        const bellyWave = Math.max(0, Math.min(1.8, Math.abs(s.dVel) * 0.016 + Math.max(0, (s.depthNorm || 0) - 0.2) * 0.6));
 
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
-        ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
+        ctx.translate(pelvisSway, pelvisBounce);
 
         // belly swells when the womb is pumped overfull
         // soft-knee bloat curve: linear to 300%, compressed growth beyond,
         // so a 1000% womb balloons hugely without breaking the geometry
         const wombEff = s.cum.womb <= 3 ? s.cum.womb : 3 + (s.cum.womb - 3) * 0.55;
-        const belly = Math.min(1 + wombEff, Math.max(0, s.cum.womb - 0.9) * 1.6);
+        const belly = Math.min(1 + wombEff, Math.max(0, s.cum.womb - 0.9) * 1.6) + bellyWave * 0.12;
         // a lengthened canal pushes the womb farther up: extend the window's
         // far end to keep it in frame (entrance edge stays anchored)
         const lenExtra = Math.max(0, (s.L / (s.CANAL_SCALE || 1)) * ((s.CANAL_SCALE || 1) - 1));
@@ -205,7 +209,7 @@ export function createMissionaryRenderer(canvas) {
 
         // Navel (above the x-ray window)
         ctx.beginPath();
-        ctx.ellipse(49, 8.6, 0.7, 1.15, 0, 0, Math.PI * 2);
+        ctx.ellipse(49, 12.4, 0.72, 1.08, 0, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(178, 90, 114, 0.55)';
         ctx.fill();
 
@@ -215,14 +219,14 @@ export function createMissionaryRenderer(canvas) {
         for (const m of [1, -1]) {
             const X = v => 49.5 + m * (v - 49.5);
             ctx.beginPath();
-            ctx.moveTo(X(37), 35);
-            ctx.quadraticCurveTo(X(24), 38, X(10), 47);      // outer top edge
-            ctx.quadraticCurveTo(X(0), 53, X(-2), 63);
+            ctx.moveTo(X(37), 35 + Math.abs(thighPulse) * 0.08);
+            ctx.quadraticCurveTo(X(24), 38 + Math.abs(thighPulse) * 0.12, X(10), 47 + Math.abs(thighPulse) * 0.25);      // outer top edge
+            ctx.quadraticCurveTo(X(0), 53 + Math.abs(thighPulse) * 0.22, X(-2), 63);
             ctx.lineTo(X(30), 63);
-            ctx.quadraticCurveTo(X(42), 58, X(47.8), 52);    // lower inner edge
-            ctx.quadraticCurveTo(X(49.4), 50.2, X(49.35), 49.0); // apex beside the vulva
-            ctx.quadraticCurveTo(X(46), 43.5, X(41.5), 39.5);    // inner V edge
-            ctx.quadraticCurveTo(X(39), 36.5, X(37), 35);
+            ctx.quadraticCurveTo(X(42), 58 - thighPulse * 0.18, X(47.8), 52 - thighPulse * 0.2);    // lower inner edge
+            ctx.quadraticCurveTo(X(49.4), 50.2 - thighPulse * 0.22, X(49.35), 49.0 - thighPulse * 0.2); // apex beside the vulva
+            ctx.quadraticCurveTo(X(46), 43.5 - thighPulse * 0.12, X(41.5), 39.5 - thighPulse * 0.08);    // inner V edge
+            ctx.quadraticCurveTo(X(39), 36.5, X(37), 35 + Math.abs(thighPulse) * 0.08);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
@@ -232,6 +236,7 @@ export function createMissionaryRenderer(canvas) {
         }
 
         // ==================== X-ray window ====================
+        if (showXray) {
         windowPath();
         ctx.strokeStyle = PAL.windowRim;
         ctx.lineWidth = 1.8;
@@ -474,6 +479,31 @@ export function createMissionaryRenderer(canvas) {
         }
 
         ctx.restore(); // end window clip
+        } else {
+            const press = Math.min(1, Math.max(0, s.depthNorm || 0));
+            ctx.save();
+            torsoPath(belly);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 2.4 - winShift, 12.5 + bellyWave * 0.7, 15.2 + bellyWave * 0.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + press * 0.04})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 11.2 - winShift, 7.6 + press * 1.8, 3.6 + press * 0.7, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(178, 90, 114, ${0.08 + press * 0.12})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(WIN.x, WIN.y - 6.2 - winShift);
+            ctx.quadraticCurveTo(WIN.x + s.jig.x * 0.08, WIN.y + 4.1 - winShift, WIN.x, WIN.y + 13.6 - winShift);
+            ctx.strokeStyle = `rgba(178, 90, 114, ${0.08 + press * 0.13})`;
+            ctx.lineWidth = 0.55;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 8.8 - winShift, 6.0 + press * 1.5, 2.0 + press * 0.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
+            ctx.fill();
+            ctx.restore();
+        }
         ctx.restore(); // end body/jiggle layer
 
         // ==================== shaft layer (no jiggle) ====================
@@ -547,9 +577,21 @@ export function createMissionaryRenderer(canvas) {
                         ctx.stroke();
                     }
                 }
+                if ((s.cum.condom || 0) > 0.01) {
+                    const tip = spine[0].pos;
+                    const fill = Math.min(1, s.cum.condom || 0);
+                    ctx.beginPath();
+                    ctx.ellipse(tip.x, tip.y + 1.2, 1.15 + fill * 0.45, 1.7 + fill * 0.95, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(252,250,255,${0.42 + fill * 0.28})`;
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(120, 190, 255, 0.50)';
+                    ctx.lineWidth = 0.38;
+                    ctx.stroke();
+                }
             }
         }
 
+        if (showXray) {
         // Rugae ribs wrapping the tube (drawn over the shaft, inside the window)
         ctx.save();
         ctx.save();
@@ -612,6 +654,8 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
+        }
+
         // ==================== labia overlay ====================
         ctx.save();
         ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
@@ -642,7 +686,7 @@ export function createMissionaryRenderer(canvas) {
         // Spawn rate scales with leak level AND how many loads have been pumped in.
         const totalLoads = s.cum.vagCount + s.cum.wombCount;
         const gush = s.cum.leak * (1 + 0.7 * Math.max(0, totalLoads - 1));
-        if (gush > 0.05) {
+        if (!protection && gush > 0.05) {
             puddle = Math.max(puddle, Math.min(1.3, 0.2 + 0.3 * Math.max(0, totalLoads - 1)));
             leakAcc += dt * (1.5 + 7 * gush);
             while (leakAcc > 1) {
@@ -667,7 +711,7 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
         // white squeezed out around the entrance, over the lips
-        if (s.cum.leak > 0.15) {
+        if (!protection && s.cum.leak > 0.15) {
             const a = Math.min(0.9, s.cum.leak + 0.2);
             ctx.fillStyle = `rgba(252,250,255,${a})`;
             for (const m of [1, -1]) {
@@ -680,29 +724,6 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
-        if (!showXray) {
-            ctx.save();
-            ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
-            ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y - winShift, winRx, winRy, 0, 0, Math.PI * 2);
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(178, 90, 114, 0.25)';
-            ctx.lineWidth = 0.45;
-            ctx.stroke();
-            const press = Math.min(1, Math.max(0, s.depthNorm || 0));
-            ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 10.5 - winShift, 7 + press * 1.8, 3.2 + press * 0.5, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(178, 90, 114, ${0.08 + press * 0.10})`;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(WIN.x, WIN.y - 5 - winShift);
-            ctx.quadraticCurveTo(WIN.x + (s.jig.x*0.12), WIN.y + 4 - winShift, WIN.x, WIN.y + 13 - winShift);
-            ctx.strokeStyle = `rgba(178, 90, 114, ${0.10 + press * 0.12})`;
-            ctx.lineWidth = 0.55;
-            ctx.stroke();
-            ctx.restore();
-        }
     }
 
     function destroy() { ro.disconnect(); }

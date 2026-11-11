@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.0
+# Greyhaven Motion v0.1.1
 
 Missionary-only MVP for SillyTavern.
 
@@ -17,3 +17,13 @@ Missionary-only MVP for SillyTavern.
 ## Notes
 - This MVP reuses the same motion engine approach as the inspected reference extension, but the panel flow is reworked for hidden staging instead of chatbox dumping.
 - The summary is inserted as a hidden system prompt for one turn and is not written into the visible chat input.
+
+
+## v0.1.1 fixes
+- Mobile scrolling and safer iPhone top offset
+- Tabs for Actions / Scene / Prompt
+- Better styled controls on mobile
+- Non-X-ray view now hides the oval cutout and uses normal body shading
+- Added subtle receiver body motion / pelvic reaction
+- Protection visual no longer leaks outside
+- Lowered navel and cleaned torso top seam

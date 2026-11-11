@@ -1,48 +1,57 @@
 #ghmotion_panel {
   position: fixed;
-  top: 70px;
-  right: 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  right: 10px;
+  left: auto;
   width: min(460px, calc(100vw - 20px));
-  max-height: calc(100vh - 90px);
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - 86px);
   display: flex;
   flex-direction: column;
-  background: rgba(15, 16, 24, 0.98);
+  background: rgba(15, 16, 24, 0.985);
   border: 1px solid rgba(145, 115, 235, 0.25);
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: 0 16px 40px rgba(0,0,0,0.35);
   z-index: 3500;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 #ghmotion_header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, rgba(32, 35, 54, 1), rgba(18, 19, 29, 1));
+  padding: 12px 12px 10px;
+  background: linear-gradient(180deg, rgba(32, 35, 54, 0.98), rgba(18, 19, 29, 0.98));
   border-bottom: 1px solid rgba(255,255,255,0.06);
   cursor: move;
 }
 .ghmotion-title-wrap {
   display: flex;
   flex-direction: column;
-  min-width: 120px;
+  min-width: 138px;
 }
 .ghmotion-title { font-weight: 700; font-size: 16px; }
-.ghmotion-sub { font-size: 11px; opacity: .7; }
+.ghmotion-sub { font-size: 11px; opacity: .72; }
 #ghmotion_status {
   flex: 1;
   text-align: center;
   font-size: 12px;
-  opacity: .85;
+  opacity: .9;
+  white-space: nowrap;
 }
 .ghmotion-icon {
   appearance: none;
   border: 0;
   color: #fff;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.09);
   border-radius: 999px;
   width: 34px;
   height: 34px;
+  flex: 0 0 auto;
 }
 #ghmotion_canvas_wrap {
   padding: 10px 10px 0;
@@ -51,9 +60,33 @@
   width: 100%;
   aspect-ratio: 100 / 64;
   background: #e6e6ef;
-  border-radius: 12px;
+  border-radius: 14px;
   display: block;
   touch-action: none;
+}
+#ghmotion_tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px;
+  padding: 10px 10px 0;
+}
+.ghmotion-tab {
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+}
+.ghmotion-tab.active {
+  background: linear-gradient(180deg, #8a5cf6, #6f48d7);
+  color: white;
+  border-color: rgba(255,255,255,0.08);
+}
+.ghmotion-tab-panel {
+  display: none;
+}
+.ghmotion-tab-panel.active {
+  display: block;
 }
 #ghmotion_controls {
   display: grid;
@@ -62,14 +95,18 @@
   padding: 10px;
 }
 #ghmotion_controls .menu_button,
-#ghmotion_preview .menu_button {
-  min-height: 38px;
+#ghmotion_preview .menu_button,
+.ghmotion-tab {
+  min-height: 40px;
+}
+#ghmotion_controls .menu_button {
+  font-size: 14px;
 }
 #ghmotion_quick {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 10px;
-  padding: 0 10px 10px;
+  padding: 10px;
   font-size: 13px;
 }
 #ghmotion_quick label {
@@ -77,15 +114,33 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+#ghmotion_quick input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #8a5cf6;
+}
+#ghmotion_quick input[type='number'],
+#ghmotion_quick select,
+#ghmotion_summary {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 10px;
-  padding: 8px 10px;
 }
 #ghmotion_quick input[type='number'],
 #ghmotion_quick select {
-  width: 82px;
+  width: 100px;
   flex: 0 0 auto;
+  padding: 7px 9px;
+}
+#ghmotion_quick input[type='number']::placeholder,
+#ghmotion_summary::placeholder {
+  color: rgba(255,255,255,0.55);
 }
 #ghmotion_preview {
   border-top: 1px solid rgba(255,255,255,0.06);
@@ -104,10 +159,11 @@
   width: 100%;
   min-height: 150px;
   resize: vertical;
+  padding: 10px;
 }
 .ghmotion-help {
   font-size: 11px;
-  opacity: .7;
+  opacity: .72;
   margin-top: 6px;
   line-height: 1.35;
 }
@@ -119,9 +175,17 @@
   #ghmotion_panel {
     width: calc(100vw - 12px);
     right: 6px;
-    top: 58px;
-    max-height: calc(100vh - 64px);
+    top: calc(env(safe-area-inset-top, 0px) + 82px);
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - 92px);
+    border-radius: 16px;
+  }
+  #ghmotion_header {
+    padding-top: 14px;
   }
   #ghmotion_controls { grid-template-columns: repeat(2, minmax(0,1fr)); }
   #ghmotion_quick { grid-template-columns: 1fr; }
+  #ghmotion_status {
+    font-size: 11px;
+    text-align: right;
+  }
 }
