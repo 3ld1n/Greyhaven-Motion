@@ -55,3 +55,8 @@ Missionary-only MVP for SillyTavern.
 - improved non-X-ray opening/depth rendering
 - stronger repeated cum effect in protection mode, including fill along the condom
 - immediate fluid response on cum button for protected and unprotected modes
+
+## v0.1.5 rendering hotfix
+- Restored the missing motion interpolation helper that caused the canvas to render only its background in v0.1.4.
+- No behavior or settings changes in this hotfix.
+- Renderer smoke-tested in Chromium (normal, motion, non-X-ray, and repeated-event views).

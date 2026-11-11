@@ -122,6 +122,7 @@ export function createMissionaryRenderer(canvas) {
         const now = performance.now();
         const dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
         lastT = now;
+        const ease = (current, target, speed) => current + (target - current) * Math.min(1, dt * speed);
 
         // reset cosmetic state after a Discard
         if (s.cum.vagCount === 0 && s.cum.wombCount === 0 && s.cum.vag < 0.01) {
