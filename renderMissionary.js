@@ -191,6 +191,23 @@ export function createMissionaryRenderer(canvas) {
         disp.open = ease(disp.open, targetOpeningSpread, 11);
         const openingSpread = disp.open;
 
+        // One shared edge for the non-X-ray cover, the moving-layer clip and the final outline.
+        // All three must use the same points or subpixel seams will keep reappearing.
+        const occlusionOpen = Math.max(0, Math.min(1, motionContact * 1.15));
+        const hasMadeContact = (s.maxReach || 0) > 0.06 || s.inside || occlusionOpen > 0.05;
+        const edgeW = 2.10 + openingSpread * 2.05;
+        const edgeH = 0.92 + openingSpread * 0.96;
+        const edgeY = E.y + 2.00;
+        const edgePoints = [];
+        for (let i = 0; i <= 36; i++) {
+            const t = -1 + 2 * i / 36;
+            edgePoints.push({ x: E.x + edgeW * t, y: edgeY - edgeH * Math.sqrt(Math.max(0, 1 - t * t)) });
+        }
+        function traceEdge() {
+            ctx.moveTo(edgePoints[0].x, edgePoints[0].y);
+            for (let i = 1; i < edgePoints.length; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
+        }
+
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
         ctx.translate(pelvisSway, pelvisBounce);
@@ -539,18 +556,16 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
             ctx.fill();
 
-            // Opening underlay: keep it hidden while the folds are shut, then reveal a tighter depth oval on contact.
+            // Opening underlay: hidden before first contact, then it stays visible.
+            // Keep only the darker depth shape so no pale/tan line appears under the rim.
             const openW = 2.10 + openingSpread * 2.05;
             const openH = 0.92 + openingSpread * 0.96;
             const openY = E.y + 2.02;
-            if (contactOpen > 0.06) {
+            const shownOpen = hasMadeContact ? Math.max(contactOpen, 0.18) : 0;
+            if (shownOpen > 0.06) {
                 ctx.beginPath();
-                ctx.ellipse(E.x, openY + 0.06, Math.max(0.92, openW * 0.80), Math.max(0.62, openH * 0.84), 0, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(78, 36, 48, ${0.18 + contactOpen * 0.36})`;
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(E.x, openY - 0.06, Math.max(0.70, openW * 0.60), Math.max(0.16, openH * 0.18), 0, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 214, 220, ${0.05 + contactOpen * 0.05})`;
+                ctx.ellipse(E.x, openY + 0.08, Math.max(0.96, openW * 0.82), Math.max(0.66, openH * 0.88), 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(78, 36, 48, ${0.22 + shownOpen * 0.30})`;
                 ctx.fill();
             }
             ctx.restore();
@@ -567,6 +582,23 @@ export function createMissionaryRenderer(canvas) {
         }
 
         const spine = s.spine;
+        // Clip the whole moving layer to the visible side of the exact same edge.
+        // This prevents internal segments reappearing through the cover at extreme depth.
+        ctx.save();
+        if (!showXray && hasMadeContact) {
+            // Match the transform later used by the overlying skin layer.
+            ctx.translate(pelvisSway, pelvisBounce);
+            ctx.beginPath();
+            ctx.moveTo(-10, edgeY);
+            ctx.lineTo(edgePoints[0].x, edgePoints[0].y);
+            for (let i = 1; i < edgePoints.length; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
+            ctx.lineTo(110, edgeY);
+            ctx.lineTo(110, SCENE_H + 20);
+            ctx.lineTo(-10, SCENE_H + 20);
+            ctx.closePath();
+            ctx.clip();
+            ctx.translate(-pelvisSway, -pelvisBounce);
+        }
         if (spine.length > 2) {
             const topEdge = [], botEdge = [];
             for (let i = 0; i < spine.length; i++) {
@@ -589,7 +621,7 @@ export function createMissionaryRenderer(canvas) {
 
             const gTop = topEdge.filter((_, i) => spine[i].u <= 4.0);
             const gBot = botEdge.filter((_, i) => spine[i].u <= 4.0);
-            if (gTop.length > 1) {
+            if (gTop.length > 1 && (showXray || !s.inside)) {
                 ctx.beginPath();
                 smoothPath(ctx, gTop);
                 smoothPath(ctx, [...gBot].reverse(), true);
@@ -663,6 +695,7 @@ export function createMissionaryRenderer(canvas) {
                 }
             }
         }
+        ctx.restore(); // moving layer clip; the cover is drawn in unclipped scene coordinates
 
         if (!showXray) {
             // Cover any internal/overlapping shaft so the non-x-ray view reads as a normal external view.
@@ -685,55 +718,40 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            const openW = 2.10 + openingSpread * 2.05;
-            const openH = 0.92 + openingSpread * 0.96;
-            const openY = E.y + 2.02;
-            const contactOpen = Math.max(0, Math.min(1, motionContact * 1.15));
-            const rimY = openY - 0.02;
-            const foldTopY = openY - (1.12 + openH * 0.46);
-            const bridgeBottomY = rimY - Math.max(0.28, openH * 0.48);
-            const bridgeOuterY = rimY - Math.max(0.08, openH * 0.18);
-
-            // Upper skin bridge/fold. It sits fully ABOVE the rim and acts as the top mask.
-            // This prevents the shaft from showing past the rim and removes the tan band under it.
-            ctx.beginPath();
-            ctx.moveTo(E.x - openW - 0.30, bridgeOuterY);
-            ctx.quadraticCurveTo(E.x - openW * 0.86, foldTopY + 0.10, E.x, foldTopY - 0.24);
-            ctx.quadraticCurveTo(E.x + openW * 0.86, foldTopY + 0.10, E.x + openW + 0.30, bridgeOuterY);
-            ctx.lineTo(E.x + openW * 0.82, bridgeBottomY + 0.02);
-            ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.14, E.x - openW * 0.82, bridgeBottomY + 0.02);
-            ctx.closePath();
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-
-            // Fill the hidden pocket behind the rim so the shaft vanishes exactly at the rim line.
-            if (contactOpen > 0.04) {
+            if (hasMadeContact) {
+                // Fully opaque, edge-aligned cover drawn OVER the moving layer.
+                // Its lower boundary is precisely the rim line, with no separate tan strip below.
                 ctx.beginPath();
-                ctx.moveTo(E.x - openW * 0.86, rimY + 0.02);
-                ctx.quadraticCurveTo(E.x, rimY - 0.06, E.x + openW * 0.86, rimY + 0.02);
-                ctx.lineTo(E.x + openW * 0.62, bridgeBottomY + 0.04);
-                ctx.quadraticCurveTo(E.x, bridgeBottomY + 0.10, E.x - openW * 0.62, bridgeBottomY + 0.04);
+                ctx.moveTo(edgePoints[0].x - 0.7, edgeY - edgeH - 5.2);
+                ctx.lineTo(edgePoints[edgePoints.length - 1].x + 0.7, edgeY - edgeH - 5.2);
+                ctx.lineTo(edgePoints[edgePoints.length - 1].x, edgePoints[edgePoints.length - 1].y);
+                for (let i = edgePoints.length - 2; i >= 0; i--) {
+                    ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
+                }
                 ctx.closePath();
-                ctx.fillStyle = 'rgba(78, 36, 48, 0.34)';
+                ctx.fillStyle = PAL.skin;
                 ctx.fill();
-            }
 
-            // Subtle inner crease hints live above the fold cover; keep the outer slivers gone.
-            for (const m of [1, -1]) {
+                // Extra upper bridge of skin above the rim to cover the gap and hide the shaft
+                // immediately after it passes the rim. This sits above the shaft but under the rim line.
+                const bridgeTopY = edgeY - edgeH - 0.98;
+                const bridgeBottomY = edgeY - edgeH + 0.10;
+                const bridgeOuterY = edgeY - 0.08;
                 ctx.beginPath();
-                ctx.moveTo(E.x + m * (openW * 0.78), openY - 0.96);
-                ctx.quadraticCurveTo(E.x + m * (openW * 0.60), openY - 0.64, E.x + m * (openW * 0.50), bridgeBottomY + 0.06);
-                ctx.strokeStyle = 'rgba(148, 88, 98, 0.24)';
-                ctx.lineWidth = 0.44;
-                ctx.stroke();
-            }
+                ctx.moveTo(E.x - edgeW - 0.28, bridgeOuterY);
+                ctx.quadraticCurveTo(E.x - edgeW * 0.82, bridgeTopY + 0.16, E.x, bridgeTopY - 0.16);
+                ctx.quadraticCurveTo(E.x + edgeW * 0.82, bridgeTopY + 0.16, E.x + edgeW + 0.28, bridgeOuterY);
+                ctx.lineTo(E.x + edgeW * 0.70, bridgeBottomY);
+                ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.10, E.x - edgeW * 0.70, bridgeBottomY);
+                ctx.closePath();
+                ctx.fillStyle = PAL.skin;
+                ctx.fill();
 
-            // Draw the rim only once contact opens the folds, and keep it tucked under the upper skin bridge.
-            if (contactOpen > 0.05) {
+                // Exactly one rim line, drawn LAST. No second underlining shape.
                 ctx.beginPath();
-                ctx.ellipse(E.x, rimY, openW, openH, 0, Math.PI, 0);
+                traceEdge();
                 ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-                ctx.lineWidth = 1.26;
+                ctx.lineWidth = 1.24;
                 ctx.stroke();
             }
 
