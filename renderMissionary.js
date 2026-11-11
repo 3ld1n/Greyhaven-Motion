@@ -516,15 +516,16 @@ export function createMissionaryRenderer(canvas) {
         ctx.restore(); // end window clip
         } else {
             const press = Math.min(1, Math.max(0, s.depthNorm || 0));
+            const contactOpen = Math.max(0, Math.min(1, motionContact * 1.15));
             ctx.save();
             torsoPath(belly);
             ctx.clip();
             ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 2.4 - winShift, 12.5 + bellyWave * 0.7, 15.2 + bellyWave * 0.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(WIN.x, WIN.y + 2.4 - winShift, 12.9 + bellyWave * 0.8, 15.8 + bellyWave * 0.6, 0, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + press * 0.04})`;
             ctx.fill();
             ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 11.2 - winShift, 7.6 + press * 1.8, 3.6 + press * 0.7, 0, 0, Math.PI * 2);
+            ctx.ellipse(WIN.x, WIN.y + 11.2 - winShift, 7.9 + press * 2.0, 3.8 + press * 0.8, 0, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(178, 90, 114, ${0.08 + press * 0.12})`;
             ctx.fill();
             ctx.beginPath();
@@ -538,19 +539,20 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
             ctx.fill();
 
-            // Opening underlay: dark depth sits behind the shaft, not over it.
-            // This gives the shaft something to disappear into while keeping the final rim above it.
-            const openW = 2.35 + openingSpread * 2.15;
-            const openH = 1.05 + openingSpread * 1.10;
-            const openY = E.y + 2.10;
-            ctx.beginPath();
-            ctx.ellipse(E.x, openY + 0.10, Math.max(1.0, openW * 0.82), Math.max(0.75, openH * 0.92), 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(78, 36, 48, ${0.26 + openingSpread * 0.30})`;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(E.x, openY - 0.05, Math.max(0.9, openW * 0.72), Math.max(0.40, openH * 0.28), 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 220, 226, ${0.06 + openingSpread * 0.05})`;
-            ctx.fill();
+            // Opening underlay: keep it hidden while the folds are shut, then reveal a tighter depth oval on contact.
+            const openW = 2.10 + openingSpread * 2.05;
+            const openH = 0.92 + openingSpread * 0.96;
+            const openY = E.y + 2.02;
+            if (contactOpen > 0.06) {
+                ctx.beginPath();
+                ctx.ellipse(E.x, openY + 0.06, Math.max(0.92, openW * 0.80), Math.max(0.62, openH * 0.84), 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(78, 36, 48, ${0.18 + contactOpen * 0.36})`;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(E.x, openY - 0.06, Math.max(0.70, openW * 0.60), Math.max(0.16, openH * 0.18), 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 214, 220, ${0.05 + contactOpen * 0.05})`;
+                ctx.fill();
+            }
             ctx.restore();
         }
         ctx.restore(); // end body/jiggle layer
@@ -669,11 +671,11 @@ export function createMissionaryRenderer(canvas) {
             torsoPath(belly);
             ctx.clip();
             ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 1.8 - winShift, 12.7, 15.9, 0, 0, Math.PI * 2);
+            ctx.ellipse(WIN.x, WIN.y + 1.4 - winShift, 13.4, 16.8, 0, 0, Math.PI * 2);
             ctx.fillStyle = PAL.skin;
             ctx.fill();
             ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 10.9 - winShift, 7.9 + Math.min(1, bellyWave) * 0.8, 3.0 + motionVel * 0.45, 0, 0, Math.PI * 2);
+            ctx.ellipse(WIN.x, WIN.y + 10.8 - winShift, 8.1 + Math.min(1, bellyWave) * 0.9, 3.15 + motionVel * 0.55, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(178, 90, 114, 0.10)';
             ctx.fill();
             ctx.beginPath();
@@ -683,39 +685,62 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Final portal details: build a clearer skin fold ABOVE the rim so it covers the gap area,
-            // then draw the rim on top so the shaft reads as entering beneath that upper fold.
-            const openW = 2.35 + openingSpread * 2.15;
-            const openH = 1.05 + openingSpread * 1.10;
-            const openY = E.y + 2.10;
-            const capTopY = openY - (1.00 + openH * 0.42);
-            const capBottomY = openY - 0.08;
+            const openW = 2.10 + openingSpread * 2.05;
+            const openH = 0.92 + openingSpread * 0.96;
+            const openY = E.y + 2.02;
+            const contactOpen = Math.max(0, Math.min(1, motionContact * 1.15));
+            const rimY = openY - 0.02;
+            const foldTopY = openY - (1.06 + openH * 0.42);
+            const foldBottomY = openY - 0.28;
+
+            // Upper skin bridge/fold. It sits ABOVE the rim and covers the gap area; no tan band should appear below the rim.
             ctx.beginPath();
-            ctx.moveTo(E.x - openW - 0.10, capBottomY);
-            ctx.quadraticCurveTo(E.x - openW * 0.72, capTopY + 0.10, E.x, capTopY - 0.18);
-            ctx.quadraticCurveTo(E.x + openW * 0.72, capTopY + 0.10, E.x + openW + 0.10, capBottomY);
-            ctx.quadraticCurveTo(E.x + openW * 0.32, openY - 0.30, E.x, openY - 0.36);
-            ctx.quadraticCurveTo(E.x - openW * 0.32, openY - 0.30, E.x - openW - 0.10, capBottomY);
+            ctx.moveTo(E.x - openW - 0.25, foldBottomY);
+            ctx.quadraticCurveTo(E.x - openW * 0.84, foldTopY + 0.10, E.x, foldTopY - 0.22);
+            ctx.quadraticCurveTo(E.x + openW * 0.84, foldTopY + 0.10, E.x + openW + 0.25, foldBottomY);
+            ctx.lineTo(E.x + openW * 0.70, foldBottomY - 0.02);
+            ctx.quadraticCurveTo(E.x, foldBottomY - 0.16, E.x - openW * 0.70, foldBottomY - 0.02);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
 
-            // subtle inner crease hints tucked under the fold, not the outer slivers
+            // Extra occlusion inside the opening so the shaft fully disappears right at the rim, even near 150% depth.
+            if (contactOpen > 0.04) {
+                ctx.beginPath();
+                ctx.moveTo(E.x - openW * 0.78, rimY + 0.05);
+                ctx.quadraticCurveTo(E.x, rimY - 0.10, E.x + openW * 0.78, rimY + 0.05);
+                ctx.quadraticCurveTo(E.x + openW * 0.58, openY + 0.44, E.x, openY + 0.48);
+                ctx.quadraticCurveTo(E.x - openW * 0.58, openY + 0.44, E.x - openW * 0.78, rimY + 0.05);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(78, 36, 48, 0.36)';
+                ctx.fill();
+            }
+
+            // Subtle inner crease hints live above the fold cover; keep the outer slivers gone.
             for (const m of [1, -1]) {
                 ctx.beginPath();
-                ctx.moveTo(E.x + m * (openW * 0.92), openY - 0.88);
-                ctx.quadraticCurveTo(E.x + m * (openW * 0.64), openY - 0.56, E.x + m * (openW * 0.55), openY - 0.02);
-                ctx.strokeStyle = 'rgba(148, 88, 98, 0.30)';
-                ctx.lineWidth = 0.50;
+                ctx.moveTo(E.x + m * (openW * 0.86), openY - 0.90);
+                ctx.quadraticCurveTo(E.x + m * (openW * 0.64), openY - 0.58, E.x + m * (openW * 0.54), openY - 0.06);
+                ctx.strokeStyle = 'rgba(148, 88, 98, 0.28)';
+                ctx.lineWidth = 0.48;
                 ctx.stroke();
             }
 
-            // the visible rim itself
+            // Draw the rim only once contact opens the folds, and keep it tucked under the upper skin bridge.
+            if (contactOpen > 0.05) {
+                ctx.beginPath();
+                ctx.ellipse(E.x, rimY, openW, openH, 0, Math.PI, 0);
+                ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
+                ctx.lineWidth = 1.24;
+                ctx.stroke();
+            }
+
+            // Redraw the navel above the non-xray cover so it never gets washed out.
             ctx.beginPath();
-            ctx.ellipse(E.x, openY, openW, openH, 0, Math.PI, 0);
-            ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-            ctx.lineWidth = 1.24;
-            ctx.stroke();
+            ctx.ellipse(49, 12.4, 0.72, 1.08, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(178, 90, 114, 0.55)';
+            ctx.fill();
+
             ctx.restore();
         }
 
