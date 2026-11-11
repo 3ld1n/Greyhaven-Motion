@@ -742,6 +742,11 @@ export function createSim(userOpts = {}) {
         emit('move', { depthNorm: st.depthNorm, vel: st.dVel / MAX_NORMAL, inside: st.inside });
     }
 
+    // Renderer and summaries may need direct access to the current centerline projection.
+    // Keep a stable reference on state so render branches triggered by actions like Cum/Womb
+    // can sample particles without crashing the whole canvas.
+    st.spinePoint = spinePoint;
+
     updateMaxDepth(); // fresh scene: ceiling includes the overstretch zone
 
     let acc = 0;

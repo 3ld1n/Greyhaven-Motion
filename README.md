@@ -1,3 +1,5 @@
+Greyhaven Motion v0.1.7 – action crash fix + protection-aware summaries + rim polish
+
 Greyhaven Motion v0.1.6 – action/render stability + anatomy pass
 
 # Greyhaven Motion v0.1.2

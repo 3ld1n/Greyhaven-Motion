@@ -42,6 +42,8 @@ export function buildSummary(session, state, cfg) {
         bits.push(T('hymen_break', { who, how, blood }));
     }
 
+    bits.push(T(cfg.protection ? 'protected_state' : 'raw_state', { who }));
+
     if (n > 0) {
         bits.push(T(n > 1 ? 'strokes_many' : 'strokes_one', { n, sec: dur }));
         // stroke character breakdown (deep thrusts / tip-teasing / tiny grinds)
@@ -112,18 +114,22 @@ export function buildSummary(session, state, cfg) {
         const loads = session.cumWomb > 1 ? T('cum_womb_loads_many', { n: session.cumWomb }) : T('cum_womb_loads_one', {});
         bits.push(T('cum_womb', { who, loads }));
     }
+    if (session.cumProtected > 0) {
+        bits.push(T(session.cumProtected > 1 ? 'cum_protected_many' : 'cum_protected_one', { who, n: session.cumProtected }));
+    }
 
     // Persistent scene state: cumulative load counts + current womb condition.
     // (The scene's fluids persist across turns until Discard, so this reports
     // the running total, not just this session.)
     const fluids = state?.cum;
     if (fluids) {
-        const totV = fluids.vagCount, totW = fluids.wombCount;
-        if (totV + totW > 0) {
+        const totV = fluids.vagCount, totW = fluids.wombCount, totP = fluids.condomCount || 0;
+        if (totV + totW + totP > 0) {
             const parts = [];
             if (totV > 0) parts.push(T(totV > 1 ? 'totals_vag_many' : 'totals_vag_one', { n: totV }));
             if (totW > 0) parts.push(T(totW > 1 ? 'totals_womb_many' : 'totals_womb_one', { n: totW }));
-            bits.push(T(totV + totW > 1 ? 'totals_many' : 'totals_one', { who, n: totV + totW, parts: parts.join(', ') }));
+            if (totP > 0) parts.push(T(totP > 1 ? 'totals_protected_many' : 'totals_protected_one', { n: totP }));
+            bits.push(T(totV + totW + totP > 1 ? 'totals_many' : 'totals_one', { who, n: totV + totW + totP, parts: parts.join(', ') }));
         }
         const fill_ = fluids.womb;
         if (fill_ > 0.05) {

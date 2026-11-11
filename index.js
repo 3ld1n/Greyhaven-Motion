@@ -139,6 +139,7 @@ function composeSummaryCore() {
     view: 'pov',
     actionPreamble: s.actionPreamble,
     defaultPreamble: DEFAULT_ACTION_PREAMBLE,
+    protection: s.protection,
   });
 }
 
