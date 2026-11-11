@@ -1,6 +1,8 @@
-Greyhaven Motion v0.1.7 – action crash fix + protection-aware summaries + rim polish
+Greyhaven Motion v0.1.8 – x-ray cum fix + leg reset + rim fold correction
 
-Greyhaven Motion v0.1.6 – action/render stability + anatomy pass
+Greyhaven Motion v0.1.8 – action crash fix + protection-aware summaries + rim polish
+
+Greyhaven Motion v0.1.8 – action/render stability + anatomy pass
 
 # Greyhaven Motion v0.1.2
 

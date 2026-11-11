@@ -251,9 +251,9 @@ export function createMissionaryRenderer(canvas) {
             ctx.beginPath();
             ctx.moveTo(X(37), 35.0);
             ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
-            ctx.quadraticCurveTo(X(-1.5), 54.3 + Math.abs(thighPulse) * 0.12, X(-5.5), 71.5);
-            ctx.lineTo(X(34), 71.5);
-            ctx.quadraticCurveTo(X(43), 58.2 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
+            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 63);
+            ctx.lineTo(X(30), 63);
+            ctx.quadraticCurveTo(X(42), 58.0 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
             ctx.quadraticCurveTo(X(49.25), 50.1 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 48.9 - innerPinch);
             ctx.quadraticCurveTo(X(46.2), 43.7 - thighPulse * 0.07, X(41.6), 39.6 - thighPulse * 0.05);
             ctx.quadraticCurveTo(X(39.2), 36.6, X(37), 35.0);
@@ -266,15 +266,18 @@ export function createMissionaryRenderer(canvas) {
             ctx.restore();
         }
 
-        // Subtle fold-crease hints near the groin; keep only the realistic inner ones.
-        for (const m of [1, -1]) {
+
+
+
+        const leftWall = stations.map(w => ({ x: w.pos.x - w.n.x * w.gapB, y: w.pos.y - w.n.y * w.gapB }));
+        const rightWall = stations.map(w => ({ x: w.pos.x + w.n.x * w.gapT, y: w.pos.y + w.n.y * w.gapT }));
+        const cavityPath = () => {
             ctx.beginPath();
-            ctx.moveTo(49 + m * 6.0, 35.2 + bellyWave * 0.15);
-            ctx.quadraticCurveTo(49 + m * 6.8, 38.6 + Math.abs(thighLag) * 0.08, 49 + m * 4.5, 42.2 + openingSpread * 0.42);
-            ctx.strokeStyle = 'rgba(148, 88, 98, 0.34)';
-            ctx.lineWidth = 0.58;
-            ctx.stroke();
-        }
+            smoothPath(ctx, rightWall);
+            ctx.quadraticCurveTo(CR.x, CR.y, leftWall[leftWall.length - 1].x, leftWall[leftWall.length - 1].y);
+            smoothPath(ctx, [...leftWall].reverse(), true);
+            ctx.closePath();
+        };
 
         // ==================== X-ray window ====================
         if (showXray) {
@@ -305,15 +308,6 @@ export function createMissionaryRenderer(canvas) {
         ctx.lineWidth = 0.6;
         ctx.stroke();
 
-        const leftWall = stations.map(w => ({ x: w.pos.x - w.n.x * w.gapB, y: w.pos.y - w.n.y * w.gapB }));
-        const rightWall = stations.map(w => ({ x: w.pos.x + w.n.x * w.gapT, y: w.pos.y + w.n.y * w.gapT }));
-        function cavityPath() {
-            ctx.beginPath();
-            smoothPath(ctx, rightWall);
-            ctx.quadraticCurveTo(CR.x, CR.y, leftWall[leftWall.length - 1].x, leftWall[leftWall.length - 1].y);
-            smoothPath(ctx, [...leftWall].reverse(), true);
-            ctx.closePath();
-        }
         cavityPath();
         ctx.fillStyle = PAL.cavity;
         ctx.fill();
@@ -689,28 +683,30 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Final portal details: first a soft skin bridge above the rim to cover the gap,
-            // then the rim itself so the shaft reads as entering beneath the upper skin edge.
+            // Final portal details: build a clearer skin fold ABOVE the rim so it covers the gap area,
+            // then draw the rim on top so the shaft reads as entering beneath that upper fold.
             const openW = 2.35 + openingSpread * 2.15;
             const openH = 1.05 + openingSpread * 1.10;
             const openY = E.y + 2.10;
-            const bridgeY = openY - (0.62 + openH * 0.34);
+            const capTopY = openY - (1.00 + openH * 0.42);
+            const capBottomY = openY - 0.08;
             ctx.beginPath();
-            ctx.moveTo(E.x - openW - 0.35, bridgeY + 0.18);
-            ctx.quadraticCurveTo(E.x, bridgeY - 0.65, E.x + openW + 0.35, bridgeY + 0.18);
-            ctx.lineTo(E.x + openW + 0.08, openY - 0.05);
-            ctx.quadraticCurveTo(E.x, openY - 0.44, E.x - openW - 0.08, openY - 0.05);
+            ctx.moveTo(E.x - openW - 0.10, capBottomY);
+            ctx.quadraticCurveTo(E.x - openW * 0.72, capTopY + 0.10, E.x, capTopY - 0.18);
+            ctx.quadraticCurveTo(E.x + openW * 0.72, capTopY + 0.10, E.x + openW + 0.10, capBottomY);
+            ctx.quadraticCurveTo(E.x + openW * 0.32, openY - 0.30, E.x, openY - 0.36);
+            ctx.quadraticCurveTo(E.x - openW * 0.32, openY - 0.30, E.x - openW - 0.10, capBottomY);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
 
-            // keep the realistic inner crease hints above the bridge layer
+            // subtle inner crease hints tucked under the fold, not the outer slivers
             for (const m of [1, -1]) {
                 ctx.beginPath();
-                ctx.moveTo(E.x + m * (openW + 0.95), openY - 1.05);
-                ctx.quadraticCurveTo(E.x + m * (openW + 0.55), openY - 0.62, E.x + m * (openW * 0.78), openY + 0.16);
-                ctx.strokeStyle = 'rgba(148, 88, 98, 0.34)';
-                ctx.lineWidth = 0.54;
+                ctx.moveTo(E.x + m * (openW * 0.92), openY - 0.88);
+                ctx.quadraticCurveTo(E.x + m * (openW * 0.64), openY - 0.56, E.x + m * (openW * 0.55), openY - 0.02);
+                ctx.strokeStyle = 'rgba(148, 88, 98, 0.30)';
+                ctx.lineWidth = 0.50;
                 ctx.stroke();
             }
 
@@ -718,7 +714,7 @@ export function createMissionaryRenderer(canvas) {
             ctx.beginPath();
             ctx.ellipse(E.x, openY, openW, openH, 0, Math.PI, 0);
             ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-            ctx.lineWidth = 1.22;
+            ctx.lineWidth = 1.24;
             ctx.stroke();
             ctx.restore();
         }
