@@ -37,3 +37,11 @@ Missionary-only MVP for SillyTavern.
 - fixed virgin barrier meta text
 - switched Finish label back to Cum
 - break/cervix and womb actions made more robust
+
+
+## v0.1.3
+- refined leg motion with separate per-leg pose reactions
+- improved non-X-ray depth shadow and masking near the folds
+- restored stronger repeat Cum effect in protection mode
+- break button reliability improved for cervix and womb depths
+- added visible inner thigh crease lines in X-ray mode

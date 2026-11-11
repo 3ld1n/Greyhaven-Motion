@@ -243,25 +243,34 @@ export function createSim(userOpts = {}) {
     // Slam all the way through into the womb and cum on arrival — a scripted
     // full-weight thrust that resistance yields to (unlike pointer dragging).
     function armBreak() {
-        // arm the next barrier; if we are already pressing on it, resolve immediately
+        // Arm the next barrier. Give the shaft a gentle nudge toward that depth so
+        // the button reliably works even if the user presses it while hovering near the limit.
         st.breakArmed = true;
-        if (!st.pierce && st.d > L - 1.0) {
-            st.breakArmed = false;
-            setPierce(true);
-            emit('cervix_breach', { hits: st.cervixHits });
-            st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
-            st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
-            st.womb.vx += endTan.x * 6 * opts.jiggleScale;
-            st.womb.vy += endTan.y * 6 * opts.jiggleScale;
-        } else if (st.pierce && !st.wombBroken && st.d > WOMB_TIP_LIMIT - 0.5) {
-            st.breakArmed = false;
-            st.wombBroken = true;
-            updateMaxDepth();
-            emit('womb_breach', {});
-            st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
-            st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
-            st.womb.vx += endTan.x * 7 * opts.jiggleScale;
-            st.womb.vy += endTan.y * 7 * opts.jiggleScale;
+        if (!st.pierce) {
+            st.dTarget = Math.max(st.dTarget, Math.min(CV_MAX, L + 0.2));
+            st.dVel = Math.max(st.dVel, 8.5);
+            if (st.d > L - 1.6) {
+                st.breakArmed = false;
+                setPierce(true);
+                emit('cervix_breach', { hits: st.cervixHits });
+                st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
+                st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
+                st.womb.vx += endTan.x * 6 * opts.jiggleScale;
+                st.womb.vy += endTan.y * 6 * opts.jiggleScale;
+            }
+        } else if (!st.wombBroken) {
+            st.dTarget = Math.max(st.dTarget, Math.min(WT_MAX, WOMB_TIP_LIMIT + 0.3));
+            st.dVel = Math.max(st.dVel, 7.2);
+            if (st.d > WOMB_TIP_LIMIT - 0.8) {
+                st.breakArmed = false;
+                st.wombBroken = true;
+                updateMaxDepth();
+                emit('womb_breach', {});
+                st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
+                st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
+                st.womb.vx += endTan.x * 7 * opts.jiggleScale;
+                st.womb.vy += endTan.y * 7 * opts.jiggleScale;
+            }
         }
     }
 
@@ -275,8 +284,8 @@ export function createSim(userOpts = {}) {
 
     function ejaculate() {
         // allow repeated presses to intensify the effect instead of doing nothing
-        st.cum.spurting = Math.min(4.8, Math.max(st.cum.spurting, 0) + (st.cum.spurting > 0 ? 1.15 : 2.1));
-        st.cum.spawnAcc = Math.min(st.cum.spawnAcc, 0.02);
+        st.cum.spurting = Math.min(5.2, Math.max(st.cum.spurting, 0) + (st.cum.spurting > 0 ? 1.25 : 2.15));
+        st.cum.spawnAcc = 0;
         st.hymenOver = 0; // release resets all overstretch progress
         st.cervixOver = 0;
         st.wombOver = 0;
@@ -284,7 +293,7 @@ export function createSim(userOpts = {}) {
         if (where === 'womb') st.cum.wombCount++;
         else if (where === 'vagina') st.cum.vagCount++;
         else st.cum.condomCount++;
-        if (where === 'protected') st.cum.condom = Math.min(1.35, (st.cum.condom || 0) + 0.16);
+        if (where === 'protected') st.cum.condom = Math.min(2.25, (st.cum.condom || 0) + 0.32 + Math.max(0, st.cum.condomCount - 1) * 0.03);
         // a couple of body shudders
         st.jig.vx += stations[0].tan.x * 8 * opts.jiggleScale;
         st.jig.vy += stations[0].tan.y * 8 * opts.jiggleScale;
@@ -641,7 +650,7 @@ export function createSim(userOpts = {}) {
             let done = false;
             if (opts.protection) {
                 if (p.a > 1.1 || p.v < 3) {
-                    cum.condom = Math.min(1.35, (cum.condom || 0) + 0.022);
+                    cum.condom = Math.min(2.25, (cum.condom || 0) + 0.05);
                     done = true;
                 }
             } else {
