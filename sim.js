@@ -280,20 +280,30 @@ export function createSim(userOpts = {}) {
         st.dTarget = Math.min(L + 6.0, MAX_PIERCED - 0.1);
         st.forcing = true;
         st.forcingT = 0;
+        st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
+        st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
+        st.womb.vx += endTan.x * 7 * opts.jiggleScale;
+        st.womb.vy += endTan.y * 7 * opts.jiggleScale;
     }
 
     function ejaculate() {
         // allow repeated presses to intensify the effect instead of doing nothing
-        st.cum.spurting = Math.min(5.2, Math.max(st.cum.spurting, 0) + (st.cum.spurting > 0 ? 1.25 : 2.15));
+        st.cum.spurting = Math.min(5.4, Math.max(st.cum.spurting, 0) + (st.cum.spurting > 0 ? 1.35 : 2.2));
         st.cum.spawnAcc = 0;
         st.hymenOver = 0; // release resets all overstretch progress
         st.cervixOver = 0;
         st.wombOver = 0;
         const where = opts.protection ? 'protected' : ((st.pierce && st.d > L + 1.5) ? 'womb' : 'vagina');
-        if (where === 'womb') st.cum.wombCount++;
-        else if (where === 'vagina') st.cum.vagCount++;
-        else st.cum.condomCount++;
-        if (where === 'protected') st.cum.condom = Math.min(2.25, (st.cum.condom || 0) + 0.32 + Math.max(0, st.cum.condomCount - 1) * 0.03);
+        if (where === 'womb') {
+            st.cum.wombCount++;
+            st.cum.womb = Math.min(opts.wombCapacity, (st.cum.womb || 0) + 0.26 + Math.max(0, st.cum.wombCount - 1) * 0.05);
+        } else if (where === 'vagina') {
+            st.cum.vagCount++;
+            st.cum.vag = Math.min(1.8, (st.cum.vag || 0) + 0.20 + Math.max(0, st.cum.vagCount - 1) * 0.04);
+        } else {
+            st.cum.condomCount++;
+            st.cum.condom = Math.min(3.6, (st.cum.condom || 0) + 0.65 + Math.max(0, st.cum.condomCount - 1) * 0.18);
+        }
         // a couple of body shudders
         st.jig.vx += stations[0].tan.x * 8 * opts.jiggleScale;
         st.jig.vy += stations[0].tan.y * 8 * opts.jiggleScale;
@@ -650,7 +660,7 @@ export function createSim(userOpts = {}) {
             let done = false;
             if (opts.protection) {
                 if (p.a > 1.1 || p.v < 3) {
-                    cum.condom = Math.min(2.25, (cum.condom || 0) + 0.05);
+                    cum.condom = Math.min(3.6, (cum.condom || 0) + 0.08);
                     done = true;
                 }
             } else {

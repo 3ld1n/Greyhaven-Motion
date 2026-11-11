@@ -59,6 +59,7 @@ export function createMissionaryRenderer(canvas) {
     const wombDrops = []; // womb-local coords {x,y,vx,vy}
     const leakDrops = []; // scene coords {x,y,vy}
     let leakAcc = 0, puddle = 0;
+    const disp = { contact: 0, pelvisX: 0, pelvisY: 0, thighL: 0, thighR: 0, open: 0 };
 
     function resize() {
         const dpr = window.devicePixelRatio || 1;
@@ -168,14 +169,26 @@ export function createMissionaryRenderer(canvas) {
         };
         const wombFill = s.cum.womb;
         const pierced = s.pierce && s.d > L + 0.5;
-        const motionContact = (s.inside || (s.depthNorm || 0) > 0.06) ? 1 : 0;
+        const targetContact = (s.inside || (s.depthNorm || 0) > 0.06) ? 1 : 0;
+        disp.contact = ease(disp.contact, targetContact, targetContact > disp.contact ? 9 : 5.5);
+        const motionContact = disp.contact;
         const motionVel = motionContact ? Math.min(1, Math.abs(s.dVel) / 24) : 0;
-        const pelvisSway = Math.max(-0.18, Math.min(0.18, motionContact * (s.jig.x * 0.07 + s.dVel * 0.0021)));
-        const pelvisBounce = Math.max(-0.28, Math.min(0.28, motionContact * (s.jig.y * 0.08 + s.dVel * 0.0026)));
-        const thighPulse = Math.max(-1.0, Math.min(1.0, motionContact * (s.dVel * 0.018)));
-        const thighLag = Math.max(-0.7, Math.min(0.7, motionContact * (s.jig.x * 0.12 - s.dVel * 0.0045)));
+        const targetPelvisSway = Math.max(-0.15, Math.min(0.15, motionContact * (s.jig.x * 0.06 + s.dVel * 0.0018)));
+        const targetPelvisBounce = Math.max(-0.22, Math.min(0.22, motionContact * (s.jig.y * 0.06 + s.dVel * 0.0021)));
+        disp.pelvisX = ease(disp.pelvisX, targetPelvisSway, 10);
+        disp.pelvisY = ease(disp.pelvisY, targetPelvisBounce, 10);
+        const pelvisSway = disp.pelvisX;
+        const pelvisBounce = disp.pelvisY;
+        const targetThighPulse = Math.max(-1.0, Math.min(1.0, motionContact * (s.dVel * 0.015)));
+        const targetThighLag = Math.max(-0.68, Math.min(0.68, motionContact * (s.jig.x * 0.10 - s.dVel * 0.0038)));
+        disp.thighL = ease(disp.thighL, targetThighPulse + targetThighLag * 0.55, 9);
+        disp.thighR = ease(disp.thighR, targetThighPulse - targetThighLag * 0.55, 9);
+        const thighPulse = (disp.thighL + disp.thighR) * 0.5;
+        const thighLag = (disp.thighL - disp.thighR) * 0.5;
         const bellyWave = Math.max(0, Math.min(0.85, motionContact * (Math.abs(s.dVel) * 0.004 + Math.max(0, (s.depthNorm || 0) - 0.2) * 0.16)));
-        const openingSpread = Math.max(0, Math.min(1, (((st0.gapT + st0.gapB) * 0.5) - 1.3) / 2.1 + (s.inside ? 0.2 : 0)));
+        const targetOpeningSpread = Math.max(0, Math.min(1, (((st0.gapT + st0.gapB) * 0.5) - 1.3) / 2.1 + (s.inside ? 0.2 : 0)));
+        disp.open = ease(disp.open, targetOpeningSpread, 11);
+        const openingSpread = disp.open;
 
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
@@ -217,32 +230,37 @@ export function createMissionaryRenderer(canvas) {
         ctx.fillStyle = 'rgba(178, 90, 114, 0.55)';
         ctx.fill();
 
-        // Thighs IN FRONT of the torso: draw them with a small independent pose
-        // (rotation + scale + lift) so they react separately and less like one rigid slab.
+        // Thighs IN FRONT of the torso: each leg gets its own eased pose so
+        // they move naturally instead of snapping upward as one slab.
+        const thighPose = {
+            1: { pulse: disp.thighR, lag: -thighLag },
+            '-1': { pulse: disp.thighL, lag: thighLag },
+        };
         for (const m of [1, -1]) {
             const X = v => 49.5 + m * (v - 49.5);
-            const hipX = X(38.2);
-            const hipY = 35.6;
-            const legLift = motionContact * (0.08 + Math.max(0, -thighPulse) * 0.18 + (m === 1 ? 0.04 : 0));
-            const legRot = motionContact * (m * (0.035 + Math.max(-0.04, Math.min(0.04, thighLag * 0.045))) + thighPulse * 0.018);
-            const legScaleX = 1 + motionContact * (0.015 + Math.abs(thighLag) * 0.018 + (m === 1 ? 0.008 : 0));
-            const legScaleY = 1 - motionContact * (0.012 + Math.abs(thighPulse) * 0.012) + Math.max(0, thighPulse) * 0.015;
-            const innerPinch = openingSpread * 0.55 + motionVel * 0.18;
+            const pose = thighPose[m];
+            const hipX = X(38.4);
+            const hipY = 35.8;
+            const legLift = motionContact * Math.max(0, pose.pulse) * 0.32;
+            const legRot = motionContact * (m * (0.018 + pose.lag * 0.045) + pose.pulse * 0.010);
+            const legScaleX = 1 + motionContact * (0.012 + Math.abs(pose.lag) * 0.010);
+            const legScaleY = 1 - motionContact * (0.006 + Math.abs(pose.pulse) * 0.010);
+            const innerPinch = openingSpread * 0.72 + motionVel * 0.12;
             ctx.save();
             ctx.translate(hipX, hipY);
             ctx.rotate(legRot);
             ctx.scale(legScaleX, legScaleY);
-            ctx.translate(-hipX, -hipY + legLift);
+            ctx.translate(-hipX, -hipY - legLift);
 
             ctx.beginPath();
-            ctx.moveTo(X(37), 35.0);
-            ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
-            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 63);
-            ctx.lineTo(X(30), 63);
-            ctx.quadraticCurveTo(X(42), 58.0 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
-            ctx.quadraticCurveTo(X(49.25), 50.1 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 48.9 - innerPinch);
-            ctx.quadraticCurveTo(X(46.2), 43.7 - thighPulse * 0.07, X(41.6), 39.6 - thighPulse * 0.05);
-            ctx.quadraticCurveTo(X(39.2), 36.6, X(37), 35.0);
+            ctx.moveTo(X(37.2), 35.0);
+            ctx.quadraticCurveTo(X(23.5), 38.2, X(8), 47.2 + Math.abs(pose.pulse) * 0.18 + Math.max(0, pose.lag * m) * 0.18);
+            ctx.quadraticCurveTo(X(-6), 54.2 + Math.abs(pose.pulse) * 0.12, X(-9), 67.2);
+            ctx.lineTo(X(33), 67.2);
+            ctx.quadraticCurveTo(X(43), 59.0 - pose.pulse * 0.14, X(47.8), 52.2 - pose.pulse * 0.16 - pose.lag * m * 0.12);
+            ctx.quadraticCurveTo(X(49.35), 50.0 - pose.pulse * 0.10 - pose.lag * m * 0.10, X(49.10), 48.9 - innerPinch);
+            ctx.quadraticCurveTo(X(46.0), 43.7 - pose.pulse * 0.05, X(41.6), 39.7 - pose.pulse * 0.04);
+            ctx.quadraticCurveTo(X(39.1), 36.7, X(37.2), 35.0);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
@@ -252,13 +270,13 @@ export function createMissionaryRenderer(canvas) {
             ctx.restore();
         }
 
-        // Groin crease lines on top of the thighs help the body read as 3D, in both modes.
+        // Soft thigh-to-groin seam lines help the body read as 3D.
         for (const m of [1, -1]) {
             ctx.beginPath();
-            ctx.moveTo(49 + m * 6.6, 32.8 + bellyWave * 0.2);
-            ctx.quadraticCurveTo(49 + m * 8.2, 37.2 + Math.abs(thighLag) * 0.12, 49 + m * 5.1, 43.8 + openingSpread * 0.6);
-            ctx.strokeStyle = 'rgba(148, 88, 98, 0.56)';
-            ctx.lineWidth = 0.7;
+            ctx.moveTo(49 + m * 6.7, 33.5 + bellyWave * 0.2);
+            ctx.quadraticCurveTo(49 + m * 6.0, 37.8 + Math.abs(thighLag) * 0.10, 49 + m * 4.0, 43.6 + openingSpread * 0.5);
+            ctx.strokeStyle = 'rgba(148, 88, 98, 0.32)';
+            ctx.lineWidth = 0.55;
             ctx.stroke();
         }
 
@@ -606,19 +624,32 @@ export function createMissionaryRenderer(canvas) {
                 }
                 if ((s.cum.condom || 0) > 0.01 || (s.cum.condomCount || 0) > 0) {
                     const tip = spine[0].pos;
-                    const loadBoost = Math.max(0, (s.cum.condomCount || 0) - 1) * 0.18;
-                    const fill = Math.min(1.55, (s.cum.condom || 0) + loadBoost);
+                    const loadBoost = Math.max(0, (s.cum.condomCount || 0) - 1) * 0.34;
+                    const fill = Math.min(2.6, (s.cum.condom || 0) + loadBoost);
+                    // pooled fluid in the tip
                     ctx.beginPath();
-                    ctx.ellipse(tip.x, tip.y + 1.25, 1.15 + fill * 0.58, 1.7 + fill * 1.2, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(252,250,255,${0.42 + Math.min(0.38, fill * 0.22)})`;
+                    ctx.ellipse(tip.x, tip.y + 1.35, 1.18 + fill * 0.75, 1.8 + fill * 1.45, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(252,250,255,${0.48 + Math.min(0.40, fill * 0.16)})`;
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(120, 190, 255, 0.52)';
                     ctx.lineWidth = 0.38;
                     ctx.stroke();
+                    // a milky column down the sheathed shaft grows with repeated presses
+                    const shaftFill = Math.min(1, fill / 2.2);
+                    if (shaftFill > 0.05) {
+                        ctx.beginPath();
+                        const colTop = topEdge.slice(0, Math.max(6, Math.floor(topEdge.length * (0.18 + shaftFill * 0.22))));
+                        const colBot = botEdge.slice(0, Math.max(6, Math.floor(botEdge.length * (0.18 + shaftFill * 0.22))));
+                        smoothPath(ctx, colTop.map((p, i) => ({ x: p.x * 0.92 + botEdge[i].x * 0.08, y: p.y * 0.92 + botEdge[i].y * 0.08 })));
+                        smoothPath(ctx, [...colBot].reverse().map((p, i) => ({ x: p.x * 0.92 + topEdge[colBot.length - 1 - i].x * 0.08, y: p.y * 0.92 + topEdge[colBot.length - 1 - i].y * 0.08 })), true);
+                        ctx.closePath();
+                        ctx.fillStyle = `rgba(252,250,255,${0.15 + shaftFill * 0.22})`;
+                        ctx.fill();
+                    }
                     if ((s.cum.condomCount || 0) > 1) {
                         ctx.beginPath();
-                        ctx.ellipse(tip.x, tip.y + 2.2, 0.55 + fill * 0.24, 0.95 + fill * 0.45, 0, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+                        ctx.ellipse(tip.x, tip.y + 2.35, 0.62 + fill * 0.30, 1.0 + fill * 0.58, 0, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255,255,255,0.34)';
                         ctx.fill();
                     }
                 }
@@ -646,17 +677,29 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Depth shadow right below the folds so the hidden part does not read as a flat sticker.
-            const shadowA = 0.12 + openingSpread * 0.22;
-            const shadowW = 3.2 + openingSpread * 2.1;
-            const shadowH = 1.25 + openingSpread * 1.2;
+            // Opening / depth portal behind the visible shaft. Keep it centered under the folds.
+            const openW = 2.3 + openingSpread * 2.25;
+            const openH = 1.0 + openingSpread * 1.15;
+            const openY = E.y + 2.2;
+            // side depth walls
             ctx.beginPath();
-            ctx.ellipse(E.x, E.y + 2.35, shadowW, shadowH, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(103, 48, 63, ${shadowA})`;
+            ctx.ellipse(E.x - openW * 0.48, openY + 0.05, openW * 0.68, openH * 0.88, 0.18, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(101, 49, 63, ${0.18 + openingSpread * 0.22})`;
             ctx.fill();
             ctx.beginPath();
-            ctx.ellipse(E.x, E.y + 1.25, 2.0 + openingSpread * 1.35, 0.82 + openingSpread * 0.75, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255,255,255, ${0.025 + openingSpread * 0.035})`;
+            ctx.ellipse(E.x + openW * 0.48, openY + 0.05, openW * 0.68, openH * 0.88, -0.18, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(101, 49, 63, ${0.18 + openingSpread * 0.22})`;
+            ctx.fill();
+            // top rim above the shaft
+            ctx.beginPath();
+            ctx.ellipse(E.x, openY - 0.25, openW, openH, 0, Math.PI, 0);
+            ctx.strokeStyle = 'rgba(203, 142, 165, 0.95)';
+            ctx.lineWidth = 0.75;
+            ctx.stroke();
+            // dark center cavity under the shaft
+            ctx.beginPath();
+            ctx.ellipse(E.x, openY + 0.22, Math.max(0.85, openW * 0.54), Math.max(0.55, openH * 0.58), 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(84, 35, 52, ${0.22 + openingSpread * 0.28})`;
             ctx.fill();
             ctx.restore();
         }
@@ -726,14 +769,15 @@ export function createMissionaryRenderer(canvas) {
 
         }
 
-        // Inner-thigh crease lines should remain visible in X-ray mode too.
+        // In X-ray mode, redraw the groin/inner-thigh body outlines above the window
+        // so the anatomy does not look cut away by the overlay.
         if (showXray) {
             for (const m of [1, -1]) {
                 ctx.beginPath();
-                ctx.moveTo(49 + m * 10.1, 34.0 + bellyWave * 0.2);
-                ctx.quadraticCurveTo(49 + m * 7.8, 38.7 + Math.abs(thighLag) * 0.18, 49 + m * 4.7, 44.7 + openingSpread * 0.85);
-                ctx.strokeStyle = 'rgba(148, 88, 98, 0.62)';
-                ctx.lineWidth = 0.72;
+                ctx.moveTo(49 + m * 13.5, 36.0);
+                ctx.quadraticCurveTo(49 + m * 9.7, 39.3 + Math.abs(thighLag) * 0.16, 49 + m * 5.0, 46.0 + openingSpread * 0.62);
+                ctx.strokeStyle = PAL.skinLine;
+                ctx.lineWidth = 0.9;
                 ctx.stroke();
             }
         }

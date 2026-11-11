@@ -27,6 +27,7 @@ const DEFAULT_STYLE_GUIDE =
 
 const defaultSettings = {
   receiverName: '',
+  giverName: '',
   xrayMode: true,
   protection: false,
   virginMode: false,
@@ -144,6 +145,7 @@ function composeSummaryCore() {
 function buildHiddenContext() {
   const s = settings();
   const who = (s.receiverName || '').trim() || '{{char}}';
+  const giver = (s.giverName || '').trim() || '{{user}}';
   let summary = composeSummaryCore().trim();
   if (summary.startsWith('[') && summary.endsWith(']')) {
     summary = summary.slice(1, -1);
@@ -158,7 +160,7 @@ function buildHiddenContext() {
     `max depth: ${Math.round(Number(s.maxDepthPct))}%`,
     (s.virginMode && !sim?.state?.hymen?.broken) ? 'virgin barrier intact' : (sim?.state?.hymen?.broken ? 'virgin barrier broken' : 'virgin barrier not active'),
   ].join('; ');
-  const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who);
+  const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who).replaceAll('{{giver}}', giver);
   return `*${meta}; ${summary}; ${guide}*`;
 }
 
@@ -400,8 +402,46 @@ function togglePanel() {
   }
 }
 
+
+function mountSettingsPanel() {
+  const host = document.querySelector('#extensions_settings2') || document.querySelector('#extensions_settings');
+  if (!host || document.getElementById('ghmotion_settings_drawer')) return;
+  const s = settings();
+  const wrap = document.createElement('div');
+  wrap.id = 'ghmotion_settings_drawer';
+  wrap.className = 'inline-drawer';
+  wrap.innerHTML = `
+    <div class="inline-drawer-toggle inline-drawer-header">
+      <b>Greyhaven Motion</b>
+      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    </div>
+    <div class="inline-drawer-content">
+      <div class="ghmotion-settings-grid">
+        <label><span>Receiver name</span><input id="ghmotion_setting_receiver" class="text_pole" type="text" placeholder="{{char}}"></label>
+        <label><span>Giver name</span><input id="ghmotion_setting_giver" class="text_pole" type="text" placeholder="{{user}}"></label>
+        <label><span>Action preamble</span><textarea id="ghmotion_setting_preamble" class="text_pole" rows="3"></textarea></label>
+        <label><span>Style guide</span><textarea id="ghmotion_setting_guide" class="text_pole" rows="4"></textarea></label>
+      </div>
+      <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. The hidden summary auto-clears after the next generated reply.</div>
+    </div>`;
+  host.appendChild(wrap);
+  const receiver = wrap.querySelector('#ghmotion_setting_receiver');
+  const giver = wrap.querySelector('#ghmotion_setting_giver');
+  const preamble = wrap.querySelector('#ghmotion_setting_preamble');
+  const guide = wrap.querySelector('#ghmotion_setting_guide');
+  receiver.value = s.receiverName || '';
+  giver.value = s.giverName || '';
+  preamble.value = s.actionPreamble || DEFAULT_ACTION_PREAMBLE;
+  guide.value = s.styleGuide || DEFAULT_STYLE_GUIDE;
+  receiver.addEventListener('input', () => { s.receiverName = receiver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+  giver.addEventListener('input', () => { s.giverName = giver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+  preamble.addEventListener('input', () => { s.actionPreamble = preamble.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+  guide.addEventListener('input', () => { s.styleGuide = guide.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+}
+
 jQuery(() => {
   const s = settings();
+  mountSettingsPanel();
 
   $('body').append(`
     <div id="ghmotion_panel" style="display:none;">

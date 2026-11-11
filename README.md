@@ -45,3 +45,13 @@ Missionary-only MVP for SillyTavern.
 - restored stronger repeat Cum effect in protection mode
 - break button reliability improved for cervix and womb depths
 - added visible inner thigh crease lines in X-ray mode
+
+
+## v0.1.4
+- added Greyhaven Motion settings drawer in SillyTavern extension settings
+- receiver/giver names are configurable
+- eased leg motion to remove first-contact teleport feel
+- improved X-ray thigh outline redraw on top of the belly window
+- improved non-X-ray opening/depth rendering
+- stronger repeated cum effect in protection mode, including fill along the condom
+- immediate fluid response on cum button for protected and unprotected modes

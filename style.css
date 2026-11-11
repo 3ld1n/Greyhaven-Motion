@@ -189,3 +189,32 @@
     text-align: right;
   }
 }
+
+
+#ghmotion_settings_drawer {
+  margin-top: 10px;
+}
+#ghmotion_settings_drawer .inline-drawer-content {
+  padding: 10px 0 4px;
+}
+.ghmotion-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.ghmotion-settings-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ghmotion-settings-grid input,
+.ghmotion-settings-grid textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.ghmotion-settings-help {
+  opacity: .8;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
