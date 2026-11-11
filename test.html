@@ -1,0 +1,18 @@
+<!doctype html><html><body>
+<canvas id='c' width='500' height='800' style='width:500px;height:800px;border:1px solid #ccc'></canvas>
+<script type='module'>
+import { createSim, CENTERLINES } from './sim.js';
+import { createMissionaryRenderer } from './renderMissionary.js';
+window.errors=[]; window.addEventListener('error',e=>{window.errors.push(String(e.error||e.message)); console.error(e.error||e.message);});
+const c=document.getElementById('c');
+const sim=createSim({centerline:CENTERLINES.pov,protection:false,penisInches:8,maxDepthPct:100,canalLength:1,tightness:1});
+const r=createMissionaryRenderer(c); r.setXray(false); r.setProtection(false);
+let last=performance.now();
+function frame(t){ const dt=(t-last)/1000; last=t; sim.update(dt); r.render(sim); requestAnimationFrame(frame);} requestAnimationFrame(frame);
+let target=0; setInterval(()=>{ target = target?0:45; sim.setTarget({x:50,y:47-target});}, 700);
+window.sim=sim; window.r=r;
+setTimeout(()=>sim.ejaculate(),2000);
+setTimeout(()=>sim.slamToWomb(),4000);
+setTimeout(()=>sim.ejaculate(),4500);
+</script>
+</body></html>

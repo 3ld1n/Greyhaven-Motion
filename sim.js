@@ -302,7 +302,7 @@ export function createSim(userOpts = {}) {
             st.cum.vag = Math.min(1.8, (st.cum.vag || 0) + 0.20 + Math.max(0, st.cum.vagCount - 1) * 0.04);
         } else {
             st.cum.condomCount++;
-            st.cum.condom = Math.min(3.6, (st.cum.condom || 0) + 0.65 + Math.max(0, st.cum.condomCount - 1) * 0.18);
+            st.cum.condom = Math.min(4.5, (st.cum.condom || 0) + 0.06 + Math.max(0, st.cum.condomCount - 1) * 0.02);
         }
         // a couple of body shudders
         st.jig.vx += stations[0].tan.x * 8 * opts.jiggleScale;
@@ -660,7 +660,7 @@ export function createSim(userOpts = {}) {
             let done = false;
             if (opts.protection) {
                 if (p.a > 1.1 || p.v < 3) {
-                    cum.condom = Math.min(3.6, (cum.condom || 0) + 0.08);
+                    cum.condom = Math.min(4.5, (cum.condom || 0) + 0.015);
                     done = true;
                 }
             } else {

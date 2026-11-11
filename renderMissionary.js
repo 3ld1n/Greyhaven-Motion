@@ -231,37 +231,32 @@ export function createMissionaryRenderer(canvas) {
         ctx.fillStyle = 'rgba(178, 90, 114, 0.55)';
         ctx.fill();
 
-        // Thighs IN FRONT of the torso: each leg gets its own eased pose so
-        // they move naturally instead of snapping upward as one slab.
-        const thighPose = {
-            1: { pulse: disp.thighR, lag: -thighLag },
-            '-1': { pulse: disp.thighL, lag: thighLag },
-        };
+        // Thighs IN FRONT of the torso: restore the more human, softer v0.1.3 leg silhouettes,
+        // while keeping eased motion so contact does not pop or teleport.
         for (const m of [1, -1]) {
             const X = v => 49.5 + m * (v - 49.5);
-            const pose = thighPose[m];
-            const hipX = X(38.4);
-            const hipY = 35.8;
-            const legLift = motionContact * Math.max(0, pose.pulse) * 0.32;
-            const legRot = motionContact * (m * (0.018 + pose.lag * 0.045) + pose.pulse * 0.010);
-            const legScaleX = 1 + motionContact * (0.012 + Math.abs(pose.lag) * 0.010);
-            const legScaleY = 1 - motionContact * (0.006 + Math.abs(pose.pulse) * 0.010);
-            const innerPinch = openingSpread * 0.72 + motionVel * 0.12;
+            const hipX = X(38.2);
+            const hipY = 35.6;
+            const legLift = motionContact * (0.08 + Math.max(0, -thighPulse) * 0.18 + (m === 1 ? 0.04 : 0));
+            const legRot = motionContact * (m * (0.035 + Math.max(-0.04, Math.min(0.04, thighLag * 0.045))) + thighPulse * 0.018);
+            const legScaleX = 1 + motionContact * (0.015 + Math.abs(thighLag) * 0.018 + (m === 1 ? 0.008 : 0));
+            const legScaleY = 1 - motionContact * (0.012 + Math.abs(thighPulse) * 0.012) + Math.max(0, thighPulse) * 0.015;
+            const innerPinch = openingSpread * 0.55 + motionVel * 0.18;
             ctx.save();
             ctx.translate(hipX, hipY);
             ctx.rotate(legRot);
             ctx.scale(legScaleX, legScaleY);
-            ctx.translate(-hipX, -hipY - legLift);
+            ctx.translate(-hipX, -hipY + legLift);
 
             ctx.beginPath();
-            ctx.moveTo(X(37.2), 35.0);
-            ctx.quadraticCurveTo(X(23.5), 38.2, X(8), 47.2 + Math.abs(pose.pulse) * 0.18 + Math.max(0, pose.lag * m) * 0.18);
-            ctx.quadraticCurveTo(X(-6), 54.2 + Math.abs(pose.pulse) * 0.12, X(-9), 67.2);
-            ctx.lineTo(X(33), 67.2);
-            ctx.quadraticCurveTo(X(43), 59.0 - pose.pulse * 0.14, X(47.8), 52.2 - pose.pulse * 0.16 - pose.lag * m * 0.12);
-            ctx.quadraticCurveTo(X(49.35), 50.0 - pose.pulse * 0.10 - pose.lag * m * 0.10, X(49.10), 48.9 - innerPinch);
-            ctx.quadraticCurveTo(X(46.0), 43.7 - pose.pulse * 0.05, X(41.6), 39.7 - pose.pulse * 0.04);
-            ctx.quadraticCurveTo(X(39.1), 36.7, X(37.2), 35.0);
+            ctx.moveTo(X(37), 35.0);
+            ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
+            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 63);
+            ctx.lineTo(X(30), 63);
+            ctx.quadraticCurveTo(X(42), 58.0 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
+            ctx.quadraticCurveTo(X(49.25), 50.1 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 48.9 - innerPinch);
+            ctx.quadraticCurveTo(X(46.2), 43.7 - thighPulse * 0.07, X(41.6), 39.6 - thighPulse * 0.05);
+            ctx.quadraticCurveTo(X(39.2), 36.6, X(37), 35.0);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
@@ -271,13 +266,13 @@ export function createMissionaryRenderer(canvas) {
             ctx.restore();
         }
 
-        // Soft thigh-to-groin seam lines help the body read as 3D.
+        // Subtle groin crease lines on top of the thighs help the body read as 3D, in both modes.
         for (const m of [1, -1]) {
             ctx.beginPath();
-            ctx.moveTo(49 + m * 6.7, 33.5 + bellyWave * 0.2);
-            ctx.quadraticCurveTo(49 + m * 6.0, 37.8 + Math.abs(thighLag) * 0.10, 49 + m * 4.0, 43.6 + openingSpread * 0.5);
-            ctx.strokeStyle = 'rgba(148, 88, 98, 0.32)';
-            ctx.lineWidth = 0.55;
+            ctx.moveTo(49 + m * 6.6, 32.8 + bellyWave * 0.2);
+            ctx.quadraticCurveTo(49 + m * 8.2, 37.2 + Math.abs(thighLag) * 0.12, 49 + m * 5.1, 43.8 + openingSpread * 0.6);
+            ctx.strokeStyle = 'rgba(148, 88, 98, 0.56)';
+            ctx.lineWidth = 0.7;
             ctx.stroke();
         }
 
@@ -548,6 +543,20 @@ export function createMissionaryRenderer(canvas) {
             ctx.ellipse(WIN.x, WIN.y + 8.8 - winShift, 6.0 + press * 1.5, 2.0 + press * 0.5, 0, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
             ctx.fill();
+
+            // Opening underlay: dark depth sits behind the shaft, not over it.
+            // This gives the shaft something to disappear into while keeping the final rim above it.
+            const openW = 2.35 + openingSpread * 2.15;
+            const openH = 1.05 + openingSpread * 1.10;
+            const openY = E.y + 2.10;
+            ctx.beginPath();
+            ctx.ellipse(E.x, openY + 0.10, Math.max(1.0, openW * 0.82), Math.max(0.75, openH * 0.92), 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(78, 36, 48, ${0.26 + openingSpread * 0.30})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(E.x, openY - 0.05, Math.max(0.9, openW * 0.72), Math.max(0.40, openH * 0.28), 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 220, 226, ${0.06 + openingSpread * 0.05})`;
+            ctx.fill();
             ctx.restore();
         }
         ctx.restore(); // end body/jiggle layer
@@ -625,32 +634,34 @@ export function createMissionaryRenderer(canvas) {
                 }
                 if ((s.cum.condom || 0) > 0.01 || (s.cum.condomCount || 0) > 0) {
                     const tip = spine[0].pos;
-                    const loadBoost = Math.max(0, (s.cum.condomCount || 0) - 1) * 0.34;
-                    const fill = Math.min(2.6, (s.cum.condom || 0) + loadBoost);
-                    // pooled fluid in the tip
+                    const loadBoost = Math.max(0, (s.cum.condomCount || 0) - 1) * 0.16;
+                    const fill = Math.min(4.5, (s.cum.condom || 0) + loadBoost);
+                    // pooled fluid in the tip grows gradually across presses instead of jumping to max.
                     ctx.beginPath();
-                    ctx.ellipse(tip.x, tip.y + 1.35, 1.18 + fill * 0.75, 1.8 + fill * 1.45, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(252,250,255,${0.48 + Math.min(0.40, fill * 0.16)})`;
+                    ctx.ellipse(tip.x, tip.y + 1.35, 1.10 + fill * 0.42, 1.65 + fill * 0.72, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(252,250,255,${0.34 + Math.min(0.36, fill * 0.10)})`;
                     ctx.fill();
-                    ctx.strokeStyle = 'rgba(120, 190, 255, 0.52)';
+                    ctx.strokeStyle = 'rgba(120, 190, 255, 0.50)';
                     ctx.lineWidth = 0.38;
                     ctx.stroke();
-                    // a milky column down the sheathed shaft grows with repeated presses
-                    const shaftFill = Math.min(1, fill / 2.2);
-                    if (shaftFill > 0.05) {
+                    // a milky column down the sheathed shaft grows farther along the protection with each load.
+                    const shaftFill = Math.min(1, fill / 4.2);
+                    if (shaftFill > 0.03) {
                         ctx.beginPath();
-                        const colTop = topEdge.slice(0, Math.max(6, Math.floor(topEdge.length * (0.18 + shaftFill * 0.22))));
-                        const colBot = botEdge.slice(0, Math.max(6, Math.floor(botEdge.length * (0.18 + shaftFill * 0.22))));
-                        smoothPath(ctx, colTop.map((p, i) => ({ x: p.x * 0.92 + botEdge[i].x * 0.08, y: p.y * 0.92 + botEdge[i].y * 0.08 })));
-                        smoothPath(ctx, [...colBot].reverse().map((p, i) => ({ x: p.x * 0.92 + topEdge[colBot.length - 1 - i].x * 0.08, y: p.y * 0.92 + topEdge[colBot.length - 1 - i].y * 0.08 })), true);
+                        const frac = Math.min(0.84, 0.18 + shaftFill * 0.62);
+                        const colLen = Math.max(6, Math.floor(topEdge.length * frac));
+                        const colTop = topEdge.slice(0, colLen);
+                        const colBot = botEdge.slice(0, colLen);
+                        smoothPath(ctx, colTop.map((p, i) => ({ x: p.x * 0.915 + botEdge[i].x * 0.085, y: p.y * 0.915 + botEdge[i].y * 0.085 })));
+                        smoothPath(ctx, [...colBot].reverse().map((p, i) => ({ x: p.x * 0.915 + topEdge[colBot.length - 1 - i].x * 0.085, y: p.y * 0.915 + topEdge[colBot.length - 1 - i].y * 0.085 })), true);
                         ctx.closePath();
-                        ctx.fillStyle = `rgba(252,250,255,${0.15 + shaftFill * 0.22})`;
+                        ctx.fillStyle = `rgba(252,250,255,${0.12 + shaftFill * 0.22})`;
                         ctx.fill();
                     }
                     if ((s.cum.condomCount || 0) > 1) {
                         ctx.beginPath();
-                        ctx.ellipse(tip.x, tip.y + 2.35, 0.62 + fill * 0.30, 1.0 + fill * 0.58, 0, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(255,255,255,0.34)';
+                        ctx.ellipse(tip.x, tip.y + 2.15, 0.56 + fill * 0.18, 0.95 + fill * 0.28, 0, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255,255,255,0.28)';
                         ctx.fill();
                     }
                 }
@@ -678,30 +689,22 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Opening / depth portal behind the visible shaft. Keep it centered under the folds.
-            const openW = 2.3 + openingSpread * 2.25;
-            const openH = 1.0 + openingSpread * 1.15;
-            const openY = E.y + 2.2;
-            // side depth walls
+            // Final portal rim: drawn after the shaft so the top edge sits above it,
+            // while the dark cavity remains below it from the earlier underlay pass.
+            const openW = 2.35 + openingSpread * 2.15;
+            const openH = 1.05 + openingSpread * 1.10;
+            const openY = E.y + 2.10;
             ctx.beginPath();
-            ctx.ellipse(E.x - openW * 0.48, openY + 0.05, openW * 0.68, openH * 0.88, 0.18, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(101, 49, 63, ${0.18 + openingSpread * 0.22})`;
+            ctx.moveTo(E.x - openW, openY + 0.02);
+            ctx.ellipse(E.x, openY, openW, openH, 0, Math.PI, 0);
+            ctx.closePath();
+            ctx.fillStyle = PAL.skin;
             ctx.fill();
             ctx.beginPath();
-            ctx.ellipse(E.x + openW * 0.48, openY + 0.05, openW * 0.68, openH * 0.88, -0.18, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(101, 49, 63, ${0.18 + openingSpread * 0.22})`;
-            ctx.fill();
-            // top rim above the shaft
-            ctx.beginPath();
-            ctx.ellipse(E.x, openY - 0.25, openW, openH, 0, Math.PI, 0);
-            ctx.strokeStyle = 'rgba(203, 142, 165, 0.95)';
-            ctx.lineWidth = 0.75;
+            ctx.ellipse(E.x, openY, openW, openH, 0, Math.PI, 0);
+            ctx.strokeStyle = 'rgba(164, 104, 116, 0.98)';
+            ctx.lineWidth = 1.05;
             ctx.stroke();
-            // dark center cavity under the shaft
-            ctx.beginPath();
-            ctx.ellipse(E.x, openY + 0.22, Math.max(0.85, openW * 0.54), Math.max(0.55, openH * 0.58), 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(84, 35, 52, ${0.22 + openingSpread * 0.28})`;
-            ctx.fill();
             ctx.restore();
         }
 
@@ -768,19 +771,6 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
-        }
-
-        // In X-ray mode, redraw the groin/inner-thigh body outlines above the window
-        // so the anatomy does not look cut away by the overlay.
-        if (showXray) {
-            for (const m of [1, -1]) {
-                ctx.beginPath();
-                ctx.moveTo(49 + m * 13.5, 36.0);
-                ctx.quadraticCurveTo(49 + m * 9.7, 39.3 + Math.abs(thighLag) * 0.16, 49 + m * 5.0, 46.0 + openingSpread * 0.62);
-                ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.9;
-                ctx.stroke();
-            }
         }
 
         // ==================== labia overlay ====================

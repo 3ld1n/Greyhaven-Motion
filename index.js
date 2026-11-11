@@ -277,8 +277,13 @@ function gameLoop(prev) {
   const now = performance.now();
   if (sim && renderer && panelOpen) {
     const dt = (now - prev) / 1000;
-    sim.update(dt);
-    renderer.render(sim);
+    try {
+      sim.update(dt);
+      renderer.render(sim);
+    } catch (err) {
+      console.error('[Greyhaven Motion] frame error', err);
+      try { renderer?.resize?.(); } catch (_) {}
+    }
     rafId = requestAnimationFrame(() => gameLoop(now));
   }
 }
@@ -576,10 +581,20 @@ jQuery(() => {
     });
   }
 
+  const safeAction = (fn) => () => {
+    touchSession();
+    try {
+      fn?.();
+      if (sim && renderer) renderer.render(sim);
+    } catch (err) {
+      console.error('[Greyhaven Motion] action error', err);
+    }
+  };
+
   $('#ghmotion_record').on('click', toggleRecord);
-  $('#ghmotion_cum').on('click', () => { touchSession(); sim?.ejaculate?.(); });
-  $('#ghmotion_break').on('click', () => { touchSession(); sim?.armBreak?.(); });
-  $('#ghmotion_womb').on('click', () => { touchSession(); sim?.slamToWomb?.(); });
+  $('#ghmotion_cum').on('click', safeAction(() => sim?.ejaculate?.()));
+  $('#ghmotion_break').on('click', safeAction(() => sim?.armBreak?.()));
+  $('#ghmotion_womb').on('click', safeAction(() => sim?.slamToWomb?.()));
   $('#ghmotion_reset').on('click', resetSceneCompletely);
   $('#ghmotion_clear').on('click', clearStagedPrompt);
   $('#ghmotion_preview_toggle').on('click', () => {
