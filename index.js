@@ -156,7 +156,7 @@ function buildHiddenContext() {
     `tightness: ${Number(s.tightness).toFixed(1)}x`,
     `canal length: ${Number(s.canalLength).toFixed(2)}x`,
     `max depth: ${Math.round(Number(s.maxDepthPct))}%`,
-    sim?.state?.hymen?.present ? 'virgin barrier intact' : 'virgin barrier not active',
+    (s.virginMode && !sim?.state?.hymen?.broken) ? 'virgin barrier intact' : (sim?.state?.hymen?.broken ? 'virgin barrier broken' : 'virgin barrier not active'),
   ].join('; ');
   const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who);
   return `*${meta}; ${summary}; ${guide}*`;
@@ -422,7 +422,7 @@ jQuery(() => {
       <div id="ghmotion_tab_actions" class="ghmotion-tab-panel">
         <div id="ghmotion_controls">
           <button class="menu_button" id="ghmotion_record">Record</button>
-          <button class="menu_button" id="ghmotion_cum">Finish</button>
+          <button class="menu_button" id="ghmotion_cum">Cum</button>
           <button class="menu_button" id="ghmotion_break">Break</button>
           <button class="menu_button" id="ghmotion_womb">Womb</button>
           <button class="menu_button" id="ghmotion_preview_toggle">Prompt</button>

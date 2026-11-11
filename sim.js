@@ -149,7 +149,7 @@ export function createSim(userOpts = {}) {
         womb: { x: 0, y: 0, vx: 0, vy: 0 },  // womb's own jiggle offset
         pierce: false,                        // cervix penetration enabled
         maxDepth: MAX_N_EFF,
-        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0 },
+        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0 },
         // --- resistance model (scene-persistent until resetScene) ---
         maxReach: 0,          // frontier: deepest point ever stretched this scene
         loose: 0,             // 0 untouched-tight .. 1 worked loose (cum = lube)
@@ -243,7 +243,26 @@ export function createSim(userOpts = {}) {
     // Slam all the way through into the womb and cum on arrival — a scripted
     // full-weight thrust that resistance yields to (unlike pointer dragging).
     function armBreak() {
-        if (st.hymen.present || !st.pierce || !st.wombBroken) st.breakArmed = true;
+        // arm the next barrier; if we are already pressing on it, resolve immediately
+        st.breakArmed = true;
+        if (!st.pierce && st.d > L - 1.0) {
+            st.breakArmed = false;
+            setPierce(true);
+            emit('cervix_breach', { hits: st.cervixHits });
+            st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
+            st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
+            st.womb.vx += endTan.x * 6 * opts.jiggleScale;
+            st.womb.vy += endTan.y * 6 * opts.jiggleScale;
+        } else if (st.pierce && !st.wombBroken && st.d > WOMB_TIP_LIMIT - 0.5) {
+            st.breakArmed = false;
+            st.wombBroken = true;
+            updateMaxDepth();
+            emit('womb_breach', {});
+            st.jig.vx += stations[0].tan.x * 10 * opts.jiggleScale;
+            st.jig.vy += stations[0].tan.y * 10 * opts.jiggleScale;
+            st.womb.vx += endTan.x * 7 * opts.jiggleScale;
+            st.womb.vy += endTan.y * 7 * opts.jiggleScale;
+        }
     }
 
     function slamToWomb() {
@@ -255,9 +274,9 @@ export function createSim(userOpts = {}) {
     }
 
     function ejaculate() {
-        if (st.cum.spurting > 0) return;
-        st.cum.spurting = 2.1;
-        st.cum.spawnAcc = 0;
+        // allow repeated presses to intensify the effect instead of doing nothing
+        st.cum.spurting = Math.min(4.8, Math.max(st.cum.spurting, 0) + (st.cum.spurting > 0 ? 1.15 : 2.1));
+        st.cum.spawnAcc = Math.min(st.cum.spawnAcc, 0.02);
         st.hymenOver = 0; // release resets all overstretch progress
         st.cervixOver = 0;
         st.wombOver = 0;
@@ -265,6 +284,7 @@ export function createSim(userOpts = {}) {
         if (where === 'womb') st.cum.wombCount++;
         else if (where === 'vagina') st.cum.vagCount++;
         else st.cum.condomCount++;
+        if (where === 'protected') st.cum.condom = Math.min(1.35, (st.cum.condom || 0) + 0.16);
         // a couple of body shudders
         st.jig.vx += stations[0].tan.x * 8 * opts.jiggleScale;
         st.jig.vy += stations[0].tan.y * 8 * opts.jiggleScale;
@@ -619,14 +639,14 @@ export function createSim(userOpts = {}) {
             p.a += p.v * dt;
             p.v *= (1 - 2.2 * dt);
             let done = false;
-            // a sealed hymen blocks fluid too: cum pools in the small
-            // vestibule before the membrane and can't go further
             if (opts.protection) {
                 if (p.a > 1.1 || p.v < 3) {
                     cum.condom = Math.min(1.35, (cum.condom || 0) + 0.022);
                     done = true;
                 }
             } else {
+                // a sealed hymen blocks fluid too: cum pools in the small
+                // vestibule before the membrane and can't go further
                 if (st.hymen.present && p.a > 2.4 + st.hymen.stretch) {
                     cum.vag = Math.min(0.35, cum.vag + 0.03);
                     cum.particles.splice(i, 1);
@@ -656,9 +676,11 @@ export function createSim(userOpts = {}) {
             if (cum.womb > 1.15) cum.vag = Math.min(1.8, cum.vag + dt * 0.06);
         }
         // ...and an overfilled vagina leaks out of the entrance
-        const leakTarget = opts.protection ? 0 : (st.hymen.present
-            ? Math.max(0, Math.min(1, (cum.vag - 0.12) * 3.5)) // tiny vestibule overflows readily
-            : Math.max(0, Math.min(1, (cum.vag - 0.6) * 1.6)));
+        const leakTarget = opts.protection
+            ? 0
+            : (st.hymen.present
+                ? Math.max(0, Math.min(1, (cum.vag - 0.12) * 3.5)) // tiny vestibule overflows readily
+                : Math.max(0, Math.min(1, (cum.vag - 0.6) * 1.6)));
         cum.leak += (leakTarget - cum.leak) * Math.min(1, dt * 2);
         if (cum.leak > 0.3) cum.vag = Math.max(0, cum.vag - dt * 0.012); // slow drain while leaking
 

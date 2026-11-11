@@ -168,10 +168,13 @@ export function createMissionaryRenderer(canvas) {
         };
         const wombFill = s.cum.womb;
         const pierced = s.pierce && s.d > L + 0.5;
-        const pelvisSway = Math.max(-0.8, Math.min(0.8, s.jig.x * 0.35 + s.dVel * 0.012));
-        const pelvisBounce = Math.max(-1.2, Math.min(1.2, s.jig.y * 0.35 + s.dVel * 0.018));
-        const thighPulse = Math.max(-1.5, Math.min(1.5, s.dVel * 0.028));
-        const bellyWave = Math.max(0, Math.min(1.8, Math.abs(s.dVel) * 0.016 + Math.max(0, (s.depthNorm || 0) - 0.2) * 0.6));
+        const motionContact = (s.inside || (s.depthNorm || 0) > 0.06) ? 1 : 0;
+        const motionVel = motionContact ? Math.min(1, Math.abs(s.dVel) / 28) : 0;
+        const pelvisSway = Math.max(-0.26, Math.min(0.26, motionContact * (s.jig.x * 0.12 + s.dVel * 0.0032)));
+        const pelvisBounce = Math.max(-0.45, Math.min(0.45, motionContact * (s.jig.y * 0.13 + s.dVel * 0.0048)));
+        const thighPulse = Math.max(-0.6, Math.min(0.6, motionContact * (s.dVel * 0.011)));
+        const thighLag = Math.max(-0.42, Math.min(0.42, motionContact * (s.jig.x * 0.08 - s.dVel * 0.0024)));
+        const bellyWave = Math.max(0, Math.min(0.95, motionContact * (Math.abs(s.dVel) * 0.006 + Math.max(0, (s.depthNorm || 0) - 0.2) * 0.20)));
 
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
@@ -219,14 +222,16 @@ export function createMissionaryRenderer(canvas) {
         for (const m of [1, -1]) {
             const X = v => 49.5 + m * (v - 49.5);
             ctx.beginPath();
-            ctx.moveTo(X(37), 35 + Math.abs(thighPulse) * 0.08);
-            ctx.quadraticCurveTo(X(24), 38 + Math.abs(thighPulse) * 0.12, X(10), 47 + Math.abs(thighPulse) * 0.25);      // outer top edge
-            ctx.quadraticCurveTo(X(0), 53 + Math.abs(thighPulse) * 0.22, X(-2), 63);
+            const legLift = Math.abs(thighPulse) * (0.10 + (m === 1 ? 0.02 : 0));
+            const legLag = thighLag * m;
+            ctx.moveTo(X(37), 35 + legLift);
+            ctx.quadraticCurveTo(X(24), 38 + legLift * 1.2, X(10), 47 + Math.abs(thighPulse) * 0.12 + Math.max(0, legLag) * 0.18);      // outer top edge
+            ctx.quadraticCurveTo(X(0), 53 + Math.abs(thighPulse) * 0.10, X(-2), 63);
             ctx.lineTo(X(30), 63);
-            ctx.quadraticCurveTo(X(42), 58 - thighPulse * 0.18, X(47.8), 52 - thighPulse * 0.2);    // lower inner edge
-            ctx.quadraticCurveTo(X(49.4), 50.2 - thighPulse * 0.22, X(49.35), 49.0 - thighPulse * 0.2); // apex beside the vulva
-            ctx.quadraticCurveTo(X(46), 43.5 - thighPulse * 0.12, X(41.5), 39.5 - thighPulse * 0.08);    // inner V edge
-            ctx.quadraticCurveTo(X(39), 36.5, X(37), 35 + Math.abs(thighPulse) * 0.08);
+            ctx.quadraticCurveTo(X(42), 58 - thighPulse * 0.08, X(47.8), 52 - thighPulse * 0.09 - legLag * 0.08);    // lower inner edge
+            ctx.quadraticCurveTo(X(49.4), 50.2 - thighPulse * 0.10 - legLag * 0.10, X(49.35), 49.0 - thighPulse * 0.08); // apex beside the vulva
+            ctx.quadraticCurveTo(X(46), 43.5 - thighPulse * 0.06, X(41.5), 39.5 - thighPulse * 0.05);    // inner V edge
+            ctx.quadraticCurveTo(X(39), 36.5, X(37), 35 + legLift);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
@@ -591,11 +596,34 @@ export function createMissionaryRenderer(canvas) {
             }
         }
 
+        if (!showXray) {
+            // Cover any internal/overlapping shaft so the non-x-ray view reads as a normal external view.
+            ctx.save();
+            ctx.translate(pelvisSway, pelvisBounce);
+            torsoPath(belly);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 1.8 - winShift, 12.7, 15.9, 0, 0, Math.PI * 2);
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 10.9 - winShift, 7.6 + Math.min(1, bellyWave) * 0.8, 2.9 + motionVel * 0.45, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(178, 90, 114, 0.10)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(WIN.x, WIN.y - 4.2 - winShift);
+            ctx.quadraticCurveTo(WIN.x + pelvisSway * 0.25, WIN.y + 3.2 - winShift, WIN.x, WIN.y + 12.4 - winShift);
+            ctx.strokeStyle = `rgba(178, 90, 114, ${0.09 + motionVel * 0.07})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            ctx.restore();
+        }
+
         if (showXray) {
         // Rugae ribs wrapping the tube (drawn over the shaft, inside the window)
         ctx.save();
         ctx.save();
-        ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
+        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
         windowPath();
         ctx.restore();
         ctx.clip();
@@ -627,7 +655,7 @@ export function createMissionaryRenderer(canvas) {
             if (s.hymen.present) f = Math.min(f, 0.12);
             const topY = E.y - (E.y - (CR.y + 1.2)) * f;
             ctx.save();
-            ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
+            ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
             windowPath();
             ctx.clip();
             cavityPath();
@@ -658,7 +686,7 @@ export function createMissionaryRenderer(canvas) {
 
         // ==================== labia overlay ====================
         ctx.save();
-        ctx.translate(s.jig.x * 0.35, s.jig.y * 0.35);
+        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
         for (const sign of [1, -1]) {
             const gap = sign === 1 ? st0.gapT : st0.gapB;
             const nn = { x: n0.x * sign, y: n0.y * sign };
