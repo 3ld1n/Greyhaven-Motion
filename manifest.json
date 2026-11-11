@@ -1,0 +1,11 @@
+{
+  "display_name": "Greyhaven Motion",
+  "loading_order": 110,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "OpenAI for Agim Morina",
+  "version": "0.1.0",
+  "homePage": "local"
+}
