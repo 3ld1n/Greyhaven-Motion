@@ -39,6 +39,12 @@ const defaultSettings = {
   tightness: 1.0,
   canalTightness: 1.0,
   canalLength: 1.0,
+  // User-configurable scene control limits. Defaults match v0.1.12.
+  sizeMinCm: 8, sizeMaxCm: 30,
+  depthMinPct: 100, depthMaxPct: 150,
+  tightnessMin: 0.5, tightnessMax: 2,
+  canalTightnessMin: 0.5, canalTightnessMax: 3,
+  canalLengthMin: 0.7, canalLengthMax: 1.2,
   skinHer: 'anime',
   skinHim: 'anime',
   previewOpen: false,
@@ -47,6 +53,32 @@ const defaultSettings = {
   activeTab: 'actions',
 };
 
+// Keep UI limits within the bounds already supported by the existing simulation.
+// These are not changes to the engine itself.
+const SCENE_LIMIT_SPECS = [
+  { label: 'Size', unit: 'cm', value: 'penisCm', input: '#ghmotion_size', min: 'sizeMinCm', max: 'sizeMaxCm', hardMin: 2, hardMax: 35, step: 0.1, fallback: 15, rebuild: true },
+  { label: 'Depth', unit: '%', value: 'maxDepthPct', input: '#ghmotion_depth', min: 'depthMinPct', max: 'depthMaxPct', hardMin: 100, hardMax: 150, step: 1, fallback: 150, rebuild: true },
+  { label: 'Tightness', unit: '×', value: 'tightness', input: '#ghmotion_tight', min: 'tightnessMin', max: 'tightnessMax', hardMin: 0.5, hardMax: 2, step: 0.1, fallback: 1, option: 'tightness' },
+  { label: 'Canal tightness', unit: '×', value: 'canalTightness', input: '#ghmotion_canal', min: 'canalTightnessMin', max: 'canalTightnessMax', hardMin: 0.5, hardMax: 3, step: 0.1, fallback: 1, option: 'canalTightness' },
+  { label: 'Length multiplier', unit: '×', value: 'canalLength', input: '#ghmotion_len', min: 'canalLengthMin', max: 'canalLengthMax', hardMin: 0.7, hardMax: 1.2, step: 0.05, fallback: 1, rebuild: true },
+];
+function finiteNumber(value, fallback) {
+  if (value === '' || value === null || value === undefined) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+function clipNumber(value, min, max, fallback) {
+  return Math.min(max, Math.max(min, finiteNumber(value, fallback)));
+}
+function normalizeSceneLimits(s) {
+  for (const spec of SCENE_LIMIT_SPECS) {
+    const min = clipNumber(s[spec.min], spec.hardMin, spec.hardMax, defaultSettings[spec.min]);
+    const max = clipNumber(s[spec.max], min, spec.hardMax, defaultSettings[spec.max]);
+    s[spec.min] = min;
+    s[spec.max] = max;
+    s[spec.value] = clipNumber(s[spec.value], min, max, spec.fallback);
+  }
+}
 function settings() {
   if (!extension_settings[MODULE]) extension_settings[MODULE] = {};
   const s = extension_settings[MODULE];
@@ -55,6 +87,7 @@ function settings() {
   }
   // Upgrade only the original built-in style guide, never a user's custom text.
   if (s.styleGuide === LEGACY_STYLE_GUIDE) s.styleGuide = DEFAULT_STYLE_GUIDE;
+  normalizeSceneLimits(s);
   return s;
 }
 
@@ -168,11 +201,19 @@ function buildHiddenContext() {
     `cock size: ${Number(s.penisCm).toFixed(1)} cm`,
   ];
   if (s.virginMode) {
-    metaParts.push(`virgin mode: enabled; simulated barrier: ${sim?.state?.hymen?.broken ? 'broken' : 'intact'}`);
+    const barrierBroken = !!sim?.state?.hymen?.broken;
+    // The virginity story flag belongs to the receiver only.
+    // 'Simulated barrier' is tracked separately, and its change is described once
+    // by the event phrase for the sequence where it happens.
+    metaParts.push(barrierBroken
+      ? `${who} was a virgin at the start of this scene; simulated barrier: broken`
+      : `${who} is a virgin; simulated barrier: intact`);
   }
   const meta = metaParts.join('; ');
   const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who).replaceAll('{{giver}}', giver);
-  return `*${meta}; ${summary}; ${guide}*`;
+  const text = `*${meta}; ${summary}; ${guide}*`;
+  // Respect an explicitly set giver name in *all* clauses, not only the guide.
+  return String(s.giverName || '').trim() ? text.replaceAll('{{user}}', giver) : text;
 }
 
 let injectionStaged = false;
@@ -453,6 +494,18 @@ function mountSettingsPanel() {
         <label><span>Action preamble</span><textarea id="ghmotion_setting_preamble" class="text_pole" rows="3"></textarea></label>
         <label><span>Style guide</span><textarea id="ghmotion_setting_guide" class="text_pole" rows="4"></textarea></label>
       </div>
+      <details id="ghmotion_limits_details" class="ghmotion-limits-details">
+        <summary>Scene control limits</summary>
+        <div class="ghmotion-settings-limits-grid">
+          ${SCENE_LIMIT_SPECS.map(spec => `
+            <fieldset class="ghmotion-limit-pair">
+              <legend>${spec.label} (${spec.unit})</legend>
+              <label><span>Minimum</span><input class="text_pole" type="number" id="ghmotion_limit_${spec.value}_min" min="${spec.hardMin}" max="${spec.hardMax}" step="${spec.step}"></label>
+              <label><span>Maximum</span><input class="text_pole" type="number" id="ghmotion_limit_${spec.value}_max" min="${spec.hardMin}" max="${spec.hardMax}" step="${spec.step}"></label>
+            </fieldset>`).join('')}
+        </div>
+        <div class="ghmotion-settings-help">Limits control the allowed values in the Scene tab. They stay within the current simulator's supported ranges; no motion physics are changed. For size, you can now set the minimum as low as 2 cm.</div>
+      </details>
       <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. The hidden summary auto-clears after the next generated reply.</div>
     </div>`;
   host.appendChild(wrap);
@@ -468,6 +521,41 @@ function mountSettingsPanel() {
   giver.addEventListener('input', () => { s.giverName = giver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   preamble.addEventListener('input', () => { s.actionPreamble = preamble.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   guide.addEventListener('input', () => { s.styleGuide = guide.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+
+  for (const spec of SCENE_LIMIT_SPECS) {
+    const minField = wrap.querySelector(`#ghmotion_limit_${spec.value}_min`);
+    const maxField = wrap.querySelector(`#ghmotion_limit_${spec.value}_max`);
+    minField.value = s[spec.min];
+    maxField.value = s[spec.max];
+    const onChange = (editedSide) => {
+      const before = s[spec.value];
+      // Both fields are parsed together; order of editing can never create min>max.
+      let lower = clipNumber(minField.value, spec.hardMin, spec.hardMax, s[spec.min]);
+      let upper = clipNumber(maxField.value, spec.hardMin, spec.hardMax, s[spec.max]);
+      if (lower > upper) {
+        if (editedSide === 'min') upper = lower;
+        else lower = upper;
+      }
+      s[spec.min] = lower;
+      s[spec.max] = upper;
+      normalizeSceneLimits(s);
+      minField.value = s[spec.min];
+      maxField.value = s[spec.max];
+      const sceneField = document.querySelector(spec.input);
+      if (sceneField) {
+        sceneField.min = String(s[spec.min]);
+        sceneField.max = String(s[spec.max]);
+        sceneField.value = String(s[spec.value]);
+      }
+      saveSettingsDebounced();
+      if (before !== s[spec.value]) {
+        if (spec.rebuild) rebuildGame();
+        else if (spec.option) sim?.setOptions?.({ [spec.option]: s[spec.value] });
+      }
+    };
+    minField.addEventListener('change', () => onChange('min'));
+    maxField.addEventListener('change', () => onChange('max'));
+  }
 }
 
 jQuery(() => {
@@ -505,8 +593,8 @@ jQuery(() => {
           <label><span>X-ray</span><input id="ghmotion_xray" type="checkbox"></label>
           <label><span>Protection</span><input id="ghmotion_protection" type="checkbox"></label>
           <label><span>Virgin</span><input id="ghmotion_virgin" type="checkbox"></label>
-          <label><span>Size</span><input id="ghmotion_size" type="number" min="8" max="30" step="0.5"> <span>cm</span></label>
-          <label><span>Depth</span><input id="ghmotion_depth" type="number" min="100" max="150" step="5"> <span>%</span></label>
+          <label><span>Size</span><input id="ghmotion_size" type="number" min="2" max="35" step="0.1"> <span>cm</span></label>
+          <label><span>Depth</span><input id="ghmotion_depth" type="number" min="100" max="150" step="1"> <span>%</span></label>
           <label><span>Tight</span><input id="ghmotion_tight" type="number" min="0.5" max="2" step="0.1"></label>
           <label><span>Canal</span><input id="ghmotion_canal" type="number" min="0.5" max="3" step="0.1"></label>
           <label><span>Len</span><input id="ghmotion_len" type="number" min="0.7" max="1.2" step="0.05"></label>
@@ -564,36 +652,21 @@ jQuery(() => {
     sim?.setVirgin?.(s.virginMode);
     saveSettingsDebounced();
   });
-  $('#ghmotion_size').val(s.penisCm).on('change', function () {
-    s.penisCm = Math.min(30, Math.max(8, Number(this.value) || 15));
-    this.value = s.penisCm;
-    saveSettingsDebounced();
-    rebuildGame();
-  });
-  $('#ghmotion_depth').val(s.maxDepthPct).on('change', function () {
-    s.maxDepthPct = Math.min(150, Math.max(100, Number(this.value) || 150));
-    this.value = s.maxDepthPct;
-    saveSettingsDebounced();
-    rebuildGame();
-  });
-  $('#ghmotion_tight').val(s.tightness).on('change', function () {
-    s.tightness = Math.min(2, Math.max(0.5, Number(this.value) || 1));
-    this.value = s.tightness;
-    sim?.setOptions?.({ tightness: s.tightness });
-    saveSettingsDebounced();
-  });
-  $('#ghmotion_canal').val(s.canalTightness).on('change', function () {
-    s.canalTightness = Math.min(3, Math.max(0.5, Number(this.value) || 1));
-    this.value = s.canalTightness;
-    sim?.setOptions?.({ canalTightness: s.canalTightness });
-    saveSettingsDebounced();
-  });
-  $('#ghmotion_len').val(s.canalLength).on('change', function () {
-    s.canalLength = Math.min(1.2, Math.max(0.7, Number(this.value) || 1));
-    this.value = s.canalLength;
-    saveSettingsDebounced();
-    rebuildGame();
-  });
+  for (const spec of SCENE_LIMIT_SPECS) {
+    const control = $(spec.input);
+    control.attr({ min: s[spec.min], max: s[spec.max], step: spec.step });
+    control.val(s[spec.value]).on('change', function () {
+      const value = clipNumber(this.value, s[spec.min], s[spec.max], s[spec.value]);
+      const changed = s[spec.value] !== value;
+      s[spec.value] = value;
+      this.value = String(value);
+      saveSettingsDebounced();
+      if (changed) {
+        if (spec.rebuild) rebuildGame();
+        else if (spec.option) sim?.setOptions?.({ [spec.option]: value });
+      }
+    });
+  }
 
   for (const [selId, key] of [['#ghmotion_her', 'skinHer'], ['#ghmotion_him', 'skinHim']]) {
     const sel = $(selId);

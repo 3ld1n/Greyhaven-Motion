@@ -218,3 +218,13 @@
   line-height: 1.35;
   margin-top: 6px;
 }
+
+/* Editable scene limits in SillyTavern's extension settings drawer. */
+.ghmotion-limits-details { margin: 12px 0 8px; border: 1px solid rgba(145,115,235,.22); border-radius: 10px; padding: 8px 10px; }
+.ghmotion-limits-details > summary { cursor: pointer; font-weight: 600; }
+.ghmotion-settings-limits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
+.ghmotion-limit-pair { min-width: 0; border: 1px solid rgba(145,115,235,.20); border-radius: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px; }
+.ghmotion-limit-pair legend { font-size: 12px; opacity: .9; padding: 0 4px; }
+.ghmotion-limit-pair label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ghmotion-limit-pair label span { font-size: 12px; opacity: .85; }
+.ghmotion-limit-pair input { width: 100%; box-sizing: border-box; min-width: 0; }

@@ -1,3 +1,19 @@
+# Greyhaven Motion — v0.1.13: Prompt Terminology + Configurable Limits
+
+This is a narrowly scoped follow-up to v0.1.12.
+
+- Maintains the position label on every summary.
+- Replaces “recorded” and “recording” terminology in generated summary phrases with “pace” and “sequence”. UI Record/Stop remains unchanged.
+- Virgin-mode summary explicitly identifies the receiver (not the giver), while retaining the simulated barrier's intact/broken status.
+- The event in which the simulation's configured first-time barrier changes states can be described once, without repeating it on subsequent sequences.
+- Fixes an edge case where the reported maximum per stroke was 0% despite the final contact depth exceeding zero.
+- Adds editable min/max values in Extensions Settings > Greyhaven Motion > Scene control limits.
+- Scene tab numeric fields honor configurable limits. Size minimum can be set down to 2 cm; other controls are bounded by the current engine's safe input ranges.
+- Existing configured scene values migrate automatically, retaining their values if within the new selected limits.
+- Simulation and rendering code are unchanged from v0.1.12.
+
+The minimum-size experiment changes the simulated geometry within its existing engine's constraints. On very small settings the graphic may not be proportionally accurate; increase it again if it looks clipped. There are no new Stage B mechanics in this build.
+
 # Greyhaven Motion — v0.1.12 Stage A: Summary Accuracy
 
 Stage A prompt-only update. The simulation (`sim.js`), renderer (`renderMissionary.js`), and styling remain unchanged from v0.1.11.

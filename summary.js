@@ -107,8 +107,11 @@ export function buildSummary(session, state, cfg) {
             }));
         }
         const peaks = session.strokes.map(s => s.peak);
-        const avgPeak = Math.min(100, Math.round(100 * peaks.reduce((a, b) => a + b, 0) / n));
-        const maxPeak = Math.round(100 * Math.max(...peaks));
+        // Do not cap the average at 100% when the model permits 150%.
+        // The final live position can be ahead of the latest completed stroke.
+        // Include it in the maximum to avoid a claimed 0% peak after positive contact.
+        const avgPeak = Math.round(100 * peaks.reduce((a, b) => a + b, 0) / n);
+        const maxPeak = Math.round(100 * Math.max(...peaks, Math.max(0, session.lastDepth || 0)));
         const peak = `${maxPeak}% of reference depth`;
         bits.push(T('depth_summary', { who, avg: avgPeak, peak }));
         const wombDeep = session.strokes.filter(x => x.zone === 'womb').length;
