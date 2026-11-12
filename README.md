@@ -1,3 +1,17 @@
+# Greyhaven Motion — v0.1.12 Stage A: Summary Accuracy
+
+Stage A prompt-only update. The simulation (`sim.js`), renderer (`renderMissionary.js`), and styling remain unchanged from v0.1.11.
+
+- Position always present; visual mode and physics-only configuration omitted from AI prompt.
+- Uses exact user-provided size label, protects simulator status from conflating virginity with barrier condition.
+- Doesn't call re-entry in subsequent recordings a first entry.
+- Corrected overlapping stroke categories and singular forms.
+- Uses timestamped recording pace phases and timestamped pauses; pauses in progress are closed before staging.
+- Replaced lifetime superlatives and automatic satisfaction language with recording and scene metrics.
+- Doesn't clamp reported scene maximum to 100% when the simulation permits 150%.
+- Running totals no longer say a protected finish happened inside the recipient.
+- No new protection-break/pre-fluid/automatic mechanics: those belong to Stage B.
+
 Greyhaven Motion v0.1.8 – x-ray cum fix + leg reset + rim fold correction
 
 Greyhaven Motion v0.1.8 – action crash fix + protection-aware summaries + rim polish

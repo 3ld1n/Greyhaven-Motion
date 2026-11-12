@@ -5,6 +5,37 @@
 
 import { DEFAULT_PHRASES, fill } from './phrases.js';
 
+// Group recorded stroke intervals by tempo, with a gap ending a phase.
+// This is best-effort: a gap may be a pause or movement that did not form a
+// complete stroke. Explicit pause events are reported separately.
+function timedStrokePhases(session) {
+    const strokes = session.strokes || [];
+    if (strokes.length < 5 || !Number.isFinite(session.startT) ||
+        strokes.some(s => !Number.isFinite(s.t))) return [];
+    const phases = [];
+    let current = null;
+    for (let i = 1; i < strokes.length; i++) {
+        const dt = strokes[i].t - strokes[i - 1].t;
+        if (dt <= 0 || dt > 3.2) { current = null; continue; }
+        const label = dt <= 0.7 ? 'fast segment' : dt <= 1.5 ? 'moderate segment' : 'slow segment';
+        const at = Math.max(0, strokes[i - 1].t - session.startT);
+        const until = Math.max(at, strokes[i].t - session.startT);
+        if (current && current.label === label && at - current.end < 1) {
+            current.n++;
+            current.end = until;
+        } else {
+            current = { label, n: 1, start: at, end: until };
+            phases.push(current);
+        }
+    }
+    // Suppress micro-fragmentation. Only useful sustained movement periods.
+    return phases.filter(p => p.n >= 3).slice(0, 8).map(p => ({
+        label: p.label, n: p.n + 1,
+        rate: +((p.n) / Math.max(0.1, p.end - p.start)).toFixed(2),
+        at: Math.round(p.start), until: Math.round(p.end),
+    }));
+}
+
 // cfg: { receiverName, bloodEnabled, view, actionPreamble, defaultPreamble,
 //        phrases (optional override map) }
 export function buildSummary(session, state, cfg) {
@@ -15,11 +46,18 @@ export function buildSummary(session, state, cfg) {
     const n = session.strokes.length;
     const bits = [];
 
-    // First entry: how the cock first went in matters
-    if (session.firstEntry) {
+    // First entry is a SCENE milestone, not the first insert event of every recording.
+    if (session.firstEntry && !session.sceneAlreadyContacted) {
         const v = Math.abs(session.firstEntry.speed);
         const key = v < 10 ? 'entry_slow' : v < 25 ? 'entry_gentle' : v < 45 ? 'entry_firm' : 'entry_slam';
         bits.push(T(key, { who }));
+        // This is the point initial contact happened in the recording, NOT a
+        // claimed total duration of entry (which the engine does not track yet).
+        if (Number.isFinite(session.firstEntry.atSec) && session.firstEntry.atSec >= 1) {
+            bits.push(T('first_contact_at', { sec: Math.round(session.firstEntry.atSec) }));
+        }
+    } else if (session.firstEntry && session.sceneAlreadyContacted) {
+        bits.push(T('entry_reentry', { who }));
     } else if (n > 0 || session.lastDepth > 0) {
         bits.push(T('entry_already', { who }));
     } else {
@@ -47,28 +85,31 @@ export function buildSummary(session, state, cfg) {
     if (n > 0) {
         bits.push(T(n > 1 ? 'strokes_many' : 'strokes_one', { n, sec: dur }));
         // stroke character breakdown (deep thrusts / tip-teasing / tiny grinds)
-        const deepStrokes = session.strokes.filter(x => x.travel >= 0.3).length;
+        // Make classifications mutually exclusive. Previously the same stroke could
+        // be counted as both 'short' and 'long', yielding totals larger than n.
         const tipStrokes = session.strokes.filter(x => x.peak < 0.28).length;
-        const teases = session.strokes.filter(x => x.travel < 0.12 && x.peak >= 0.28).length;
-        if (deepStrokes > 0) bits.push(T('strokes_deep', { who, n: deepStrokes }));
+        const deepStrokes = session.strokes.filter(x => x.peak >= 0.28 && x.travel >= 0.30).length;
+        const teases = session.strokes.filter(x => x.peak >= 0.28 && x.travel < 0.12).length;
+        if (deepStrokes > 0) bits.push(T(deepStrokes === 1 ? 'strokes_deep_one' : 'strokes_deep', { who, n: deepStrokes }));
         const cervixTip = session.strokes.filter(x => x.zone === 'cervix').length;
         if (cervixTip > 0) bits.push(T('strokes_cervixtip', { who, n: cervixTip }));
-        if (tipStrokes > 0) bits.push(T('strokes_tip', { who, n: tipStrokes }));
-        if (teases > 0) bits.push(T('strokes_grind', { who, n: teases }));
-        // pace trend: first third vs last third
-        const third = Math.max(1, Math.floor(n / 3));
-        const early = session.strokes.slice(0, third);
-        const late = session.strokes.slice(-third);
-        const avgSpeed = arr => arr.reduce((a, s) => a + s.speed, 0) / arr.length;
-        const e = avgSpeed(early), l = avgSpeed(late);
-        const paceKey = l > e * 1.5 ? 'pace_building'
-            : e > l * 1.5 ? 'pace_gentling'
-                : l > 25 ? 'pace_hard' : l > 12 ? 'pace_steady' : 'pace_slow';
-        bits.push(T(paceKey, { who }));
+        if (tipStrokes > 0) bits.push(T(tipStrokes === 1 ? 'strokes_tip_one' : 'strokes_tip', { who, n: tipStrokes }));
+        if (teases > 0) bits.push(T(teases === 1 ? 'strokes_grind_one' : 'strokes_grind', { who, n: teases }));
+        // Timing is measured from the recorded stroke timestamps, not shaft speed.
+        // Report the rate and chronological changes without inventing a sensation.
+        const rate = +(n / Math.max(1, dur)).toFixed(2);
+        bits.push(T('pace_avg', { rate }));
+        const timeline = timedStrokePhases(session);
+        for (const phase of timeline) {
+            bits.push(T('pace_phase', {
+                label: phase.label, n: phase.n, rate: phase.rate,
+                at: phase.at, until: phase.until,
+            }));
+        }
         const peaks = session.strokes.map(s => s.peak);
         const avgPeak = Math.min(100, Math.round(100 * peaks.reduce((a, b) => a + b, 0) / n));
         const maxPeak = Math.round(100 * Math.max(...peaks));
-        const peak = maxPeak > 102 ? T('depth_peak_beyond', { who }) : `${maxPeak}%`;
+        const peak = `${maxPeak}% of reference depth`;
         bits.push(T('depth_summary', { who, avg: avgPeak, peak }));
         const wombDeep = session.strokes.filter(x => x.zone === 'womb').length;
         const wombTipN = session.strokes.filter(x => x.zone === 'wombTip').length;
@@ -92,7 +133,13 @@ export function buildSummary(session, state, cfg) {
         bits.push(T('ball_slaps', { who, n: session.ballSlaps }));
     }
     for (const p of session.pauses) {
-        if (p > 1.5) bits.push(T('pause_hold', { who, sec: Math.round(p) }));
+        const seconds = typeof p === 'number' ? p : p?.sec;
+        if (seconds >= 2) {
+            const sec = Math.round(seconds);
+            if (typeof p === 'object' && Number.isFinite(p?.atSec)) {
+                bits.push(T('pause_positioned', { sec, at: Math.round(p.atSec) }));
+            } else bits.push(T('pause_hold', { who, sec }));
+        }
     }
     if (session.fullWithdrawals > 0) {
         bits.push(T(session.fullWithdrawals > 1 ? 'withdrawals_many' : 'withdrawals_one', { who, n: session.fullWithdrawals }));
@@ -103,9 +150,11 @@ export function buildSummary(session, state, cfg) {
     if (session.wombStretches > 0 && !session.wombBreached) {
         bits.push(T(session.wombStretches > 1 ? 'womb_stretch_many' : 'womb_stretch_one', { who, n: session.wombStretches }));
     }
+    // One event can emit both a breach and an opening notification.
+    // Avoid describing the same transition twice.
     if (session.cervixBreached) bits.push(T('cervix_breached', { who }));
+    else if (session.cervixPierced) bits.push(T('cervix_pierced', { who }));
     if (session.wombBreached) bits.push(T('womb_breached', { who }));
-    if (session.cervixPierced) bits.push(T('cervix_pierced', { who }));
     if (session.cumVag > 0) {
         const times = session.cumVag > 1 ? ' ' + session.cumVag + ' times' : '';
         bits.push(T(state?.hymen.present ? 'cum_vag_hymen' : 'cum_vag', { who, times }));
@@ -159,26 +208,23 @@ export function buildSummary(session, state, cfg) {
             bits.push(T('strain_time', { who, sec: Math.round(state.strainAcc) }));
         }
         state.strainAcc = 0;
-        const loose = state.loose;
         if (state.entrancePopped || reachNow > 1) {
-            bits.push(T(loose < 0.25 ? 'loose_tight' : loose < 0.6 ? 'loose_mid' : 'loose_open', { who }));
+            // Neutral scene-specific maximum; never claim a character's lifetime record
+            // or infer enjoyment/comfort from the simulator's physics state.
             const reachPct = Math.round(100 * reachNow / state.MAX_NORMAL);
-            if (reachPct > 5) bits.push(T('deepest_ever', { who, pct: Math.min(100, reachPct) }));
+            if (reachPct > 5) bits.push(T('scene_max', { who, pct: reachPct }));
         }
-        if (state.hymen.present) {
-            const weak = state.hymenOver > 0
-                ? T(state.hymenOver > 1 ? 'virgin_weak_many' : 'virgin_weak_one', { n: state.hymenOver })
-                : '';
-            bits.push(T('virgin_intact', { who, weak }));
-        } else if (state.hymen.broken) {
-            bits.push(T('virgin_taken', { who }));
-        }
+        // The scene metadata already describes the enabled barrier and current state.
+        // Only record the transition in the recording where it happened; don't repeat
+        // a past milestone or infer sexual history from anatomy on subsequent turns.
         if (!state.pierce && (state.cervixHits > 0 || state.cervixOver > 0)) {
             const wear = state.cervixOver > 0
                 ? T(state.cervixOver > 1 ? 'cervix_wear_weak_many' : 'cervix_wear_weak_one', { n: state.cervixOver })
                 : T('cervix_wear_held', {});
             bits.push(T(state.cervixHits === 1 ? 'cervix_knocks_one' : 'cervix_knocks_many', { who, n: state.cervixHits, wear }));
-        } else if (state.pierce) {
+        } else if (state.pierce && !(session.cervixBreached || session.cervixPierced || session.wombBreached)) {
+            // Persistent state is useful on later recordings, but don't restate it
+            // immediately after the current recording already describes the event.
             if (state.wombBroken) {
                 bits.push(T('cervix_open_womb_claimed', { who }));
             } else {

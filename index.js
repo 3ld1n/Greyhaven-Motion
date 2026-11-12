@@ -21,9 +21,12 @@ const DEFAULT_ACTION_PREAMBLE =
   'Greyhaven Motion hidden action context. Treat this as private physical context for the next reply only. ' +
   'Do not quote it, do not mention metadata, and do not list numbers unless the character would naturally react to them.';
 
-const DEFAULT_STYLE_GUIDE =
+const LEGACY_STYLE_GUIDE =
   'Respond naturally as {{receiver}}. Use the hidden action context to shape the reaction, pacing, comfort, enthusiasm, hesitation, and satisfaction. ' +
   'Do not repeat the summary verbatim.';
+const DEFAULT_STYLE_GUIDE =
+  'Respond naturally as {{receiver}} according to their established personality, boundaries, and the scene. ' +
+  'The motion log describes events, not how they must feel. Do not repeat the summary verbatim.';
 
 const defaultSettings = {
   receiverName: '',
@@ -50,6 +53,8 @@ function settings() {
   for (const k of Object.keys(defaultSettings)) {
     if (!(k in s)) s[k] = defaultSettings[k];
   }
+  // Upgrade only the original built-in style guide, never a user's custom text.
+  if (s.styleGuide === LEGACY_STYLE_GUIDE) s.styleGuide = DEFAULT_STYLE_GUIDE;
   return s;
 }
 
@@ -73,6 +78,7 @@ const session = {
   cervixBreached: false,
   wombBreached: false,
   firstEntry: null,
+  sceneAlreadyContacted: false,
   entryPopStrain: null,
   entryAttempts: 0,
   hymenBreak: null,
@@ -102,6 +108,7 @@ function resetSession() {
   session.cervixBreached = false;
   session.wombBreached = false;
   session.firstEntry = null;
+  session.sceneAlreadyContacted = false;
   session.entryPopStrain = null;
   session.entryAttempts = 0;
   session.hymenBreak = null;
@@ -123,6 +130,7 @@ function touchSession() {
     session.active = true;
     session.startT = now;
     session.frontierStart = sim ? sim.state.maxReach : 0;
+    session.sceneAlreadyContacted = !!(sim && sim.state.maxReach > 0.5);
   }
   session.lastActivityT = now;
 }
@@ -140,6 +148,7 @@ function composeSummaryCore() {
     actionPreamble: s.actionPreamble,
     defaultPreamble: DEFAULT_ACTION_PREAMBLE,
     protection: s.protection,
+    virginMode: s.virginMode,
   });
 }
 
@@ -151,16 +160,17 @@ function buildHiddenContext() {
   if (summary.startsWith('[') && summary.endsWith(']')) {
     summary = summary.slice(1, -1);
   }
-  const meta = [
+  // Only show story-relevant fields. Render mode and physics parameters are internal.
+  // Always include position: future animations will use this to communicate a switch.
+  const metaParts = [
     'position: missionary',
-    `visual mode: ${s.xrayMode ? 'x-ray' : 'non x-ray'}`,
     `protection: ${s.protection ? 'on' : 'off'}`,
-    `approximate size: ${Number(s.penisCm).toFixed(1)} cm`,
-    `tightness: ${Number(s.tightness).toFixed(1)}x`,
-    `canal length: ${Number(s.canalLength).toFixed(2)}x`,
-    `max depth: ${Math.round(Number(s.maxDepthPct))}%`,
-    (s.virginMode && !sim?.state?.hymen?.broken) ? 'virgin barrier intact' : (sim?.state?.hymen?.broken ? 'virgin barrier broken' : 'virgin barrier not active'),
-  ].join('; ');
+    `cock size: ${Number(s.penisCm).toFixed(1)} cm`,
+  ];
+  if (s.virginMode) {
+    metaParts.push(`virgin mode: enabled; simulated barrier: ${sim?.state?.hymen?.broken ? 'broken' : 'intact'}`);
+  }
+  const meta = metaParts.join('; ');
   const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who).replaceAll('{{giver}}', giver);
   return `*${meta}; ${summary}; ${guide}*`;
 }
@@ -198,6 +208,14 @@ eventSource.on(event_types.GENERATION_ENDED, () => {
 });
 
 function stopAndStageRecording() {
+  // Flush any still-in-progress stationary hold before constructing the summary.
+  if (session.pauseStart !== null) {
+    const now = performance.now() / 1000;
+    const len = now - session.pauseStart;
+    if (len >= 2) session.pauses.push({ sec: len, atSec: Math.max(0, session.pauseStart - session.startT) });
+    session.pauseStart = null;
+    session.lastActivityT = Math.max(session.lastActivityT, now);
+  }
   const ctx = getContext();
   let text = buildHiddenContext();
   text = ctx.substituteParams ? ctx.substituteParams(text) : text;
@@ -219,6 +237,7 @@ function toggleRecord() {
     session.startT = now;
     session.lastActivityT = now;
     session.frontierStart = sim ? sim.state.maxReach : 0;
+    session.sceneAlreadyContacted = !!(sim && sim.state.maxReach > 0.5);
     toastr.info('Recording motion. Stop when you want to stage the hidden summary.', 'Greyhaven Motion');
   } else {
     stopAndStageRecording();
@@ -353,9 +372,15 @@ function initGame() {
   sim.on('stroke', e => { touchSession(); session.strokes.push({ ...e, t: performance.now() / 1000 }); updateStatus(); });
   sim.on('deep', () => { touchSession(); session.deepHits++; });
   sim.on('slap', () => { if (session.active) session.ballSlaps++; });
-  sim.on('insert', e => { touchSession(); if (!session.firstEntry) session.firstEntry = { speed: e.speed }; });
+  sim.on('insert', e => {
+    touchSession();
+    if (!session.firstEntry) session.firstEntry = {
+      speed: e.speed,
+      atSec: Math.max(0, performance.now() / 1000 - session.startT),
+    };
+  });
   sim.on('withdraw', () => { if (session.active) session.fullWithdrawals++; });
-  sim.on('outstroke', e => { touchSession(); session.outStrokes.push(e); });
+  sim.on('outstroke', e => { touchSession(); session.outStrokes.push({ ...e, t: performance.now() / 1000 }); });
   sim.on('cum', e => { touchSession(); if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++; updateStatus(); });
   sim.on('cervix_pop', () => { touchSession(); session.cervixPierced = true; });
   sim.on('cervix_breach', () => { touchSession(); session.cervixBreached = true; });
@@ -377,7 +402,7 @@ function initGame() {
         if (session.pauseStart === null) session.pauseStart = now;
       } else if (session.pauseStart !== null) {
         const len = now - session.pauseStart;
-        if (len > 1.5) session.pauses.push(len);
+        if (len >= 2) session.pauses.push({ sec: len, atSec: Math.max(0, session.pauseStart - session.startT) });
         session.pauseStart = null;
         if (!still) session.lastActivityT = now;
       }
