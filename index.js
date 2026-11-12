@@ -12,6 +12,7 @@ import { createSim, CENTERLINES } from './simFacade.js';
 import { SKIN_TONES, herTone, himTone } from './skins.js';
 import { buildSummary } from './summary.js';
 import { createMissionaryRenderer } from './renderMissionary.js';
+import { createEventManager, DEFAULT_RISKS, formatEventSummary } from './eventManager.js';
 
 const MODULE = 'greyhaven_motion';
 const extension_prompt_types = { NONE: -1, IN_PROMPT: 0, IN_CHAT: 1, BEFORE_PROMPT: 2 };
@@ -51,6 +52,7 @@ const defaultSettings = {
   actionPreamble: DEFAULT_ACTION_PREAMBLE,
   styleGuide: DEFAULT_STYLE_GUIDE,
   activeTab: 'actions',
+  eventRisks: { ...DEFAULT_RISKS },
 };
 
 // Keep UI limits within the bounds already supported by the existing simulation.
@@ -88,6 +90,11 @@ function settings() {
   // Upgrade only the original built-in style guide, never a user's custom text.
   if (s.styleGuide === LEGACY_STYLE_GUIDE) s.styleGuide = DEFAULT_STYLE_GUIDE;
   normalizeSceneLimits(s);
+  if (!s.eventRisks || typeof s.eventRisks !== 'object') s.eventRisks = { ...DEFAULT_RISKS };
+  for (const [key,val] of Object.entries(DEFAULT_RISKS)) {
+    const n = Number(s.eventRisks[key]);
+    s.eventRisks[key] = Number.isFinite(n) ? Math.max(0,Math.min(100,n)) : val;
+  }
   return s;
 }
 
@@ -197,7 +204,7 @@ function buildHiddenContext() {
   // Always include position: future animations will use this to communicate a switch.
   const metaParts = [
     'position: missionary',
-    `protection: ${s.protection ? 'on' : 'off'}`,
+    `protection: ${sceneEvents.status().protection}`,
     `cock size: ${Number(s.penisCm).toFixed(1)} cm`,
   ];
   if (s.virginMode) {
@@ -211,7 +218,8 @@ function buildHiddenContext() {
   }
   const meta = metaParts.join('; ');
   const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who).replaceAll('{{giver}}', giver);
-  const text = `*${meta}; ${summary}; ${guide}*`;
+  const mechanics = formatEventSummary(sceneEvents.pending(), sceneEvents.status());
+  const text = `*${meta}; ${summary}${mechanics ? '; ' + mechanics : ''}; ${guide}*`;
   // Respect an explicitly set giver name in *all* clauses, not only the guide.
   return String(s.giverName || '').trim() ? text.replaceAll('{{user}}', giver) : text;
 }
@@ -223,6 +231,16 @@ let panelOpen = false;
 let sim = null, renderer = null, rafId = null;
 let liveStats = { depth: 0 };
 let pendingSnap = null;
+const sceneEvents = createEventManager({options:settings().eventRisks, protectedInitially:settings().protection});
+function refreshEventStatus() {
+  const el=document.getElementById('ghmotion_event_status');
+  if (!el) return;
+  const st=sceneEvents.status();
+  el.textContent = `Protection: ${st.protection} · Fluid event: ${st.preFluid}`;
+  el.classList.toggle('ghmotion-event-alert', st.protection==='broken'||st.preFluid==='occurred');
+  const btn=document.getElementById('ghmotion_break_protection');
+  if(btn) btn.disabled=st.protection!=='intact';
+}
 
 function stagePrompt(text) {
   const payload = (text || '').trim();
@@ -245,6 +263,7 @@ function clearStagedPrompt() {
 
 eventSource.on(event_types.GENERATION_ENDED, () => {
   if (!injectionStaged) return;
+  sceneEvents.markReported();
   clearStagedPrompt();
 });
 
@@ -293,6 +312,7 @@ function updateStatus() {
   const staged = injectionStaged ? ' · staged ✓' : '';
   const womb = (sim?.state?.pierce && liveStats.depth > 1.03) ? ' · womb' : '';
   el.textContent = `${rec}depth ${Math.round(Math.min(1.5, liveStats.depth) * 100)}%${womb} · strokes ${session.strokes.length}${staged}`;
+  refreshEventStatus();
 }
 
 function captureScene(fromSim) {
@@ -376,7 +396,7 @@ function initGame() {
     virgin: s.virginMode,
     blood: true,
     wombCapacity: 3,
-    protection: s.protection,
+    protection: s.protection && sceneEvents.status().protection !== 'broken',
     penisInches: cmToInches(s.penisCm),
     maxDepthPct: s.maxDepthPct,
     canalLength: s.canalLength,
@@ -388,7 +408,7 @@ function initGame() {
   renderer = createMissionaryRenderer(canvas);
   renderer.setSkin?.(herTone(s.skinHer), himTone(s.skinHim));
   renderer.setXray?.(s.xrayMode);
-  renderer.setProtection?.(s.protection);
+  renderer.setProtection?.(s.protection && sceneEvents.status().protection !== 'broken');
 
   let dragging = false, grabDepth = 0, grabScene = null;
   canvas.addEventListener('pointerdown', ev => {
@@ -410,7 +430,12 @@ function initGame() {
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
 
-  sim.on('stroke', e => { touchSession(); session.strokes.push({ ...e, t: performance.now() / 1000 }); updateStatus(); });
+  sim.on('stroke', e => {
+    touchSession(); session.strokes.push({ ...e, t: performance.now() / 1000 });
+    const result = sceneEvents.onStroke(e, performance.now()/1000);
+    if (result.broken) { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(false); }
+    updateStatus();
+  });
   sim.on('deep', () => { touchSession(); session.deepHits++; });
   sim.on('slap', () => { if (session.active) session.ballSlaps++; });
   sim.on('insert', e => {
@@ -422,7 +447,15 @@ function initGame() {
   });
   sim.on('withdraw', () => { if (session.active) session.fullWithdrawals++; });
   sim.on('outstroke', e => { touchSession(); session.outStrokes.push({ ...e, t: performance.now() / 1000 }); });
-  sim.on('cum', e => { touchSession(); if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++; updateStatus(); });
+  sim.on('cum', e => {
+    touchSession();
+    if (e.where === 'protected') {
+      sceneEvents.onProtectedRelease();
+      if(sceneEvents.status().protection==='broken') { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(false); }
+    }
+    if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++;
+    updateStatus();
+  });
   sim.on('cervix_pop', () => { touchSession(); session.cervixPierced = true; });
   sim.on('cervix_breach', () => { touchSession(); session.cervixBreached = true; });
   sim.on('womb_breach', () => { touchSession(); session.wombBreached = true; });
@@ -434,6 +467,7 @@ function initGame() {
   sim.on('hymen_break', e => { touchSession(); session.hymenBreak = e; });
   sim.on('move', e => {
     liveStats.depth = e.depthNorm;
+    sceneEvents.onDepth(e.depthNorm);
     session.lastDepth = e.depthNorm;
     session.endedInside = e.inside;
     const now = performance.now() / 1000;
@@ -457,6 +491,7 @@ function resetSceneCompletely() {
   clearStagedPrompt();
   sim?.setPierce(false);
   sim?.resetScene();
+  sceneEvents.reset(settings().protection);
   updateStatus();
 }
 
@@ -506,6 +541,15 @@ function mountSettingsPanel() {
         </div>
         <div class="ghmotion-settings-help">Limits control the allowed values in the Scene tab. They stay within the current simulator's supported ranges; no motion physics are changed. For size, you can now set the minimum as low as 2 cm.</div>
       </details>
+      <details class="ghmotion-limits-details">
+        <summary>Event probabilities (fictional simulation)</summary>
+        <div class="ghmotion-event-risk-grid">
+          ${Object.entries(DEFAULT_RISKS).map(([key,value])=>`
+            <label><span>${key.replace(/([A-Z])/g,' $1')} (%)</span><input type="number" class="text_pole" min="0" max="100" step="0.5" id="ghmotion_risk_${key}"></label>
+          `).join('')}
+        </div>
+        <div class="ghmotion-settings-help">Speed risks use one preselected roll per protection instance; completion risks are separately rolled once per event. This is a fictional game mechanic, not real-world medical probability.</div>
+      </details>
       <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. The hidden summary auto-clears after the next generated reply.</div>
     </div>`;
   host.appendChild(wrap);
@@ -521,6 +565,17 @@ function mountSettingsPanel() {
   giver.addEventListener('input', () => { s.giverName = giver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   preamble.addEventListener('input', () => { s.actionPreamble = preamble.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   guide.addEventListener('input', () => { s.styleGuide = guide.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
+
+  for (const [key,defaultVal] of Object.entries(DEFAULT_RISKS)) {
+    const field = wrap.querySelector(`#ghmotion_risk_${key}`);
+    field.value = s.eventRisks[key] ?? defaultVal;
+    field.addEventListener('change',()=>{
+      const number=clipNumber(field.value,0,100,defaultVal);
+      s.eventRisks[key]=number; field.value=number;
+      sceneEvents.configure({[key]:number});
+      saveSettingsDebounced();
+    });
+  }
 
   for (const spec of SCENE_LIMIT_SPECS) {
     const minField = wrap.querySelector(`#ghmotion_limit_${spec.value}_min`);
@@ -573,6 +628,7 @@ jQuery(() => {
         <button class="ghmotion-icon" id="ghmotion_close" title="Close">✕</button>
       </div>
       <div id="ghmotion_canvas_wrap"><canvas id="ghmotion_canvas"></canvas></div>
+      <div id="ghmotion_event_status" class="ghmotion-event-status" aria-live="polite"></div>
       <div id="ghmotion_tabs">
         <button class="ghmotion-tab" data-tab="actions">Actions</button>
         <button class="ghmotion-tab" data-tab="scene">Scene</button>
@@ -586,6 +642,7 @@ jQuery(() => {
           <button class="menu_button" id="ghmotion_womb">Womb</button>
           <button class="menu_button" id="ghmotion_preview_toggle">Prompt</button>
           <button class="menu_button" id="ghmotion_reset">Reset</button>
+          <button class="menu_button" id="ghmotion_break_protection">Break protection</button>
         </div>
       </div>
       <div id="ghmotion_tab_scene" class="ghmotion-tab-panel">
@@ -644,6 +701,8 @@ jQuery(() => {
     s.protection = this.checked;
     renderer?.setProtection?.(s.protection);
     sim?.setOptions?.({ protection: s.protection });
+    sceneEvents.setProtection(s.protection);
+    refreshEventStatus();
     if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary').value);
     saveSettingsDebounced();
   });
@@ -695,6 +754,13 @@ jQuery(() => {
   $('#ghmotion_break').on('click', safeAction(() => sim?.armBreak?.()));
   $('#ghmotion_womb').on('click', safeAction(() => sim?.slamToWomb?.()));
   $('#ghmotion_reset').on('click', resetSceneCompletely);
+  $('#ghmotion_break_protection').on('click', () => {
+    if(sceneEvents.breakProtection('manual')) {
+      sim?.setOptions?.({protection:false});
+      renderer?.setProtection?.(false);
+      updateStatus();
+    }
+  });
   $('#ghmotion_clear').on('click', clearStagedPrompt);
   $('#ghmotion_preview_toggle').on('click', () => {
     activateTab('prompt');

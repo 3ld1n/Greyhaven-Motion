@@ -96,3 +96,13 @@ Missionary-only MVP for SillyTavern.
 - Restored the missing motion interpolation helper that caused the canvas to render only its background in v0.1.4.
 - No behavior or settings changes in this hotfix.
 - Renderer smoke-tested in Chromium (normal, motion, non-X-ray, and repeated-event views).
+
+
+### v0.1.14 — Non-graphic event-state tracking
+- New scene-persistent eventManager.js, independent of Record/Stop count and canvas rendering.
+- A single risk draw per protection instance, speed-dependent thresholds, one scheduled break at a time.
+- New manual Break protection button; checkbox cycling resets the protection state.
+- Configurable simulated risk percentages in Extensions settings.
+- Pre-ejaculate event is scheduled when protection is off and scene reset; if it happens, track whether a depth threshold was reached later.
+- Compact status strip indicates protection and fluid event states. Summary appends concise chronological events.
+- This release does not draw graphic anatomical fluid effects, and does not modify the established physics or renderMissionary.js.
