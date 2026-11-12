@@ -75,6 +75,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
     return quick;
   }
   function onStroke(info={}, nowSeconds=Date.now()/1000) {
+    const firstNewEvent=log.length;
     const now=Number(nowSeconds); const pace=paceLabel(info,now);
     lastStrokeAt=now; strokeCount++;
     const depth=clamp(info.peak??info.depth??0,0,1.5);
@@ -96,13 +97,14 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
       preFluid.reachedDepth=true;
       emit('pre-fluid-depth-changed',{atDepth:depth});
     }
-    return { pace, broken:!!protection?.broken, events:log.filter(e=>e.stroke===strokeCount) };
+    return { pace, broken:!!protection?.broken, events:log.slice(firstNewEvent).map(e=>({...e})) };
   }
   function onDepth(depth) {
     if(preFluid?.happened && !preFluid.reachedDepth && Number(depth)>clamp(opts.preFluidDepth,0,100)/100) {
       preFluid.reachedDepth=true;
-      emit('pre-fluid-depth-changed',{atDepth:Number(depth)});
+      return emit('pre-fluid-depth-changed',{atDepth:Number(depth)});
     }
+    return null;
   }
   function onProtectedRelease() {
     if(!protection?.active || protection.broken) return false;
@@ -125,7 +127,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
 export function formatEventSummary(events, status) {
   const lines=[];
   for(const e of events) {
-    if(e.type==='protection-break') lines.push(`protection failed on scene stroke ${e.stroke} (${e.cause.replaceAll(':',' ')}); previous protected releases: ${e.protectedReleases}`);
+    if(e.type==='protection-break') lines.push(`protection failed on scene stroke ${e.stroke} (${e.cause.replaceAll(':',' ')}); previous protected releases: ${e.protectedReleases}${e.protectedReleases > 0 ? '; retained fluid released at failure' : ''}`);
     if(e.type==='protection-activated') lines.push('a new protection instance was enabled');
     if(e.type==='protection-removed') lines.push('protection was removed');
     if(e.type==='pre-fluid') lines.push(`pre-ejaculate event on scene stroke ${e.stroke} at approximately ${Math.round(e.atDepth*100)}% relative depth`);

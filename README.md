@@ -1,3 +1,33 @@
+# Greyhaven Motion v0.1.16 — Protection Failure Visual Parity
+
+Built directly on the working v0.1.15 package. All original controls, event percentages, ranges, prompt replay, and scene-level event tracking remain available.
+
+## What changed
+- **Same effects after failure:** a broken protective layer stays visible but is no longer considered *sealed* by the renderer. The existing unprotected entrance wash, dripping, pooled sheet effects, and multi-release scaling use their **original drawing pathways** instead of a second copy.
+- **Retained-release transfer:** on manual, motion-triggered or release-triggered failure, all prior protected release counts and saved volume are transferred **once** to the normal simulator. It resumes the ordinary animated particles without pressing Release again, even after the earlier animations finished. Repeated presses contribute to the same volume and rate multipliers as unprotected presses.
+- **V-shaped tear:** the broken layer has a persistent small V cut near its tip with a decaying flap animation. External view displays a matching small indicator near the visible surface when the tip is occluded.
+- **Tiny pre-fluid visual:** a distinct, small bead appears on the pre-fluid scene event. If the event occurs beyond the configured depth threshold (65% by default), it is rendered as reaching the deep compartment. Otherwise, it stays local until a later movement crosses the threshold, and then progresses exactly once. It never counts as a full release.
+- **Scene and reporting:** the pre-existing `eventManager.js` (introduced in v0.1.14) persists independently of Record/Stop; this update connects its states to the physics/rendering and aligns the hidden context with the broken/off distinction. Snapshots made during a size/depth rebuild also retain ongoing fluid animation state.
+
+## Testing
+Run these from the extension root with Node 22:
+
+```
+node tests/event-manager.mjs
+node tests/v015-range-replay.mjs
+node tests/v016-visual-transitions.mjs
+node tests/stage-a-follow-up.mjs
+node tests/summary-regressions.mjs
+```
+
+`tests/visual-smoke.html` is also included for a local browser smoke test. The automated tests verify the state and animation triggers; review the actual appearance in SillyTavern because the browser screenshot test was restricted in the build environment.
+
+**Note:** The 65% transport threshold is a user-configured fictional simulation rule, not a medical representation of anatomy or fluid movement.
+
+**Install:** Back up your current Greyhaven Motion folder. Replace its files with the ZIP contents (files are at ZIP root), reload SillyTavern, then start a fresh scene with Reset to evaluate the new effects. Extension settings remain unchanged.
+
+---
+
 # Greyhaven Motion v0.1.15 — Event Ranges and Same-Turn Replay
 
 Based on the working v0.1.14 package. The **existing sim.js and renderMissionary.js are unchanged**.

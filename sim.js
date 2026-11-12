@@ -149,7 +149,7 @@ export function createSim(userOpts = {}) {
         womb: { x: 0, y: 0, vx: 0, vy: 0 },  // womb's own jiggle offset
         pierce: false,                        // cervix penetration enabled
         maxDepth: MAX_N_EFF,
-        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0 },
+        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0 } },
         // --- resistance model (scene-persistent until resetScene) ---
         maxReach: 0,          // frontier: deepest point ever stretched this scene
         loose: 0,             // 0 untouched-tight .. 1 worked loose (cum = lube)
@@ -310,8 +310,71 @@ export function createSim(userOpts = {}) {
         emit('cum', { where });
     }
 
+    // The one and only transition from an intact, retained load to open flow.
+    // This is called when scene-persistent event tracking reports a break, not
+    // when the user presses the release button again. Reuse the SAME counters,
+    // pool, spurting particles, and leak target as ordinary unprotected releases.
+    function ruptureProtection() {
+        opts.protection = false;
+        const fluid = st.cum;
+        const loads = Math.max(0, fluid.condomCount || 0);
+        const stored = Math.max(0, fluid.condom || 0);
+        if (loads === 0 && stored <= 0) return { loads: 0, where: null };
+        const where = st.pierce && st.d > L + 1.5 ? 'womb' : 'vagina';
+        // Every retained press counts toward normal multi-press visual scaling.
+        for (let n = 0; n < loads; n++) {
+            if (where === 'womb') {
+                fluid.wombCount++;
+                fluid.womb = Math.min(opts.wombCapacity, fluid.womb + 0.26 + Math.max(0, fluid.wombCount - 1) * 0.05);
+            } else {
+                fluid.vagCount++;
+                fluid.vag = Math.min(1.8, fluid.vag + 0.20 + Math.max(0, fluid.vagCount - 1) * 0.04);
+            }
+        }
+        // Previously simulated volume was held in the protective layer. Move
+        // that existing volume into the regular reservoirs; do not lose it.
+        if (where === 'womb') fluid.womb = Math.min(opts.wombCapacity, fluid.womb + stored * 0.65);
+        else fluid.vag = Math.min(1.8, fluid.vag + stored * 0.90);
+        fluid.condom = 0;
+        fluid.condomCount = 0;
+        // Restart the normal particle animation even if the prior presses
+        // finished long before the failure. Existing particles remain in flight.
+        fluid.spurting = Math.min(5.4, Math.max(fluid.spurting, 2.2 + 0.45 * Math.max(0, loads - 1)));
+        fluid.spawnAcc = 0;
+        st.jig.vx += stations[0].tan.x * 3 * opts.jiggleScale;
+        st.jig.vy += stations[0].tan.y * 3 * opts.jiggleScale;
+        emit('protection-fluid-released', { loads, where, stored });
+        return { loads, where, stored };
+    }
+
+    // Intentionally tiny, independent from the full-release volume and count.
+    // Threshold crossing is an abstract game mechanic, not a medical model.
+    function registerPreFluid(depth = 0, reachedDepth = false) {
+        const fluid = st.cum;
+        if (fluid.preFluid?.active) return false;
+        fluid.preFluid = {
+            active: true, deep: !!reachedDepth, atDepth: depth,
+            animation: 1.5,
+        };
+        if (reachedDepth) fluid.womb = Math.min(opts.wombCapacity, fluid.womb + 0.018);
+        else fluid.vag = Math.min(1.8, fluid.vag + 0.018);
+        emit('pre-fluid-visual', { depth, deep: !!reachedDepth });
+        return true;
+    }
+    function advancePreFluid(depth = 0) {
+        const fluid = st.cum;
+        if (!fluid.preFluid?.active || fluid.preFluid.deep) return false;
+        fluid.preFluid.deep = true;
+        fluid.preFluid.atDepth = depth;
+        fluid.preFluid.animation = 1.5;
+        fluid.vag = Math.max(0, fluid.vag - 0.018);
+        fluid.womb = Math.min(opts.wombCapacity, fluid.womb + 0.018);
+        emit('pre-fluid-visual-depth', { depth });
+        return true;
+    }
+
     function resetFluids() {
-        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0 };
+        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0 } };
     }
 
     function step(dt) {
@@ -640,6 +703,7 @@ export function createSim(userOpts = {}) {
 
         // --- Fluids ---
         const cum = st.cum;
+        if (cum.preFluid?.animation > 0) cum.preFluid.animation = Math.max(0, cum.preFluid.animation - dt);
         if (cum.spurting > 0) {
             cum.spurting -= dt;
             cum.spawnAcc += dt;
@@ -777,7 +841,8 @@ export function createSim(userOpts = {}) {
 
     return {
         state: st, update, setTarget, nudgeTarget, on, setOptions,
-        setPierce, ejaculate, slamToWomb, armBreak, resetFluids, resetScene, setVirgin,
+        setPierce, ejaculate, ruptureProtection, registerPreFluid, advancePreFluid,
+        slamToWomb, armBreak, resetFluids, resetScene, setVirgin,
         SCENE_W, SCENE_H,
     };
 }

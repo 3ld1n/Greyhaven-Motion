@@ -198,7 +198,8 @@ function composeSummaryCore() {
     view: 'pov',
     actionPreamble: s.actionPreamble,
     defaultPreamble: DEFAULT_ACTION_PREAMBLE,
-    protection: s.protection,
+    // Broken protection uses the same unprotected physics as the display.
+    protection: sceneEvents.status().protection === 'intact',
     virginMode: s.virginMode,
   });
 }
@@ -258,6 +259,21 @@ let sim = null, renderer = null, rafId = null;
 let liveStats = { depth: 0 };
 let pendingSnap = null;
 const sceneEvents = createEventManager({options:{...settings().eventRisks, ...settings().eventRanges}, protectedInitially:settings().protection});
+function syncProtectionPresentation() {
+  const condition = sceneEvents.status().protection;
+  if (condition === 'broken') {
+    // One-time conversion; subsequent updates may run every stroke safely.
+    sim?.ruptureProtection?.();
+  } else {
+    sim?.setOptions?.({protection: condition === 'intact'});
+  }
+  renderer?.setProtection?.(condition !== 'off', condition === 'broken');
+}
+function applySceneEventVisual(e) {
+  if (!e) return;
+  if (e.type === 'pre-fluid') sim?.registerPreFluid?.(e.atDepth, e.reachedDepth);
+  if (e.type === 'pre-fluid-depth-changed') sim?.advancePreFluid?.(e.atDepth);
+}
 function refreshEventStatus() {
   const el=document.getElementById('ghmotion_event_status');
   if (!el) return;
@@ -385,7 +401,11 @@ function captureScene(fromSim) {
   return {
     cum: {
       vag: st.cum.vag, womb: st.cum.womb, leak: st.cum.leak,
+      spurting: st.cum.spurting, spawnAcc: st.cum.spawnAcc,
+      particles: (st.cum.particles || []).map(p => ({...p})),
       vagCount: st.cum.vagCount, wombCount: st.cum.wombCount,
+      condom: st.cum.condom, condomCount: st.cum.condomCount,
+      preFluid: st.cum.preFluid ? {...st.cum.preFluid} : null,
     },
     pierce: st.pierce,
     wombBroken: st.wombBroken,
@@ -405,6 +425,9 @@ function restoreScene(toSim, snap) {
   if (!toSim || !snap) return;
   const st = toSim.state;
   Object.assign(st.cum, snap.cum);
+  // Rebuild copies should not share a live effect object with an older sim.
+  if (snap.cum.preFluid) st.cum.preFluid = {...snap.cum.preFluid};
+  st.cum.particles = (snap.cum.particles || []).map(p => ({...p}));
   st.wombBroken = !!snap.wombBroken;
   toSim.setPierce(snap.pierce);
   st.cervixHits = snap.cervixHits || 0;
@@ -472,7 +495,7 @@ function initGame() {
   renderer = createMissionaryRenderer(canvas);
   renderer.setSkin?.(herTone(s.skinHer), himTone(s.skinHim));
   renderer.setXray?.(s.xrayMode);
-  renderer.setProtection?.(s.protection);
+  syncProtectionPresentation();
 
   let dragging = false, grabDepth = 0, grabScene = null;
   canvas.addEventListener('pointerdown', ev => {
@@ -497,7 +520,8 @@ function initGame() {
   sim.on('stroke', e => {
     touchSession(); session.strokes.push({ ...e, t: performance.now() / 1000 });
     const result = sceneEvents.onStroke(e, performance.now()/1000);
-    if (result.broken) { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(settings().protection); }
+    for (const event of result.events) applySceneEventVisual(event);
+    if (result.broken) syncProtectionPresentation();
     updateStatus();
   });
   sim.on('deep', () => { touchSession(); session.deepHits++; });
@@ -515,7 +539,7 @@ function initGame() {
     touchSession();
     if (e.where === 'protected') {
       sceneEvents.onProtectedRelease();
-      if(sceneEvents.status().protection==='broken') { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(settings().protection); }
+      if(sceneEvents.status().protection==='broken') syncProtectionPresentation();
     }
     if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++;
     updateStatus();
@@ -531,7 +555,7 @@ function initGame() {
   sim.on('hymen_break', e => { touchSession(); session.hymenBreak = e; });
   sim.on('move', e => {
     liveStats.depth = e.depthNorm;
-    sceneEvents.onDepth(e.depthNorm);
+    applySceneEventVisual(sceneEvents.onDepth(e.depthNorm));
     session.lastDepth = e.depthNorm;
     session.endedInside = e.inside;
     const now = performance.now() / 1000;
@@ -558,6 +582,7 @@ function resetSceneCompletely() {
   sim?.setPierce(false);
   sim?.resetScene();
   sceneEvents.reset(settings().protection);
+  syncProtectionPresentation();
   updateStatus();
 }
 
@@ -796,9 +821,14 @@ jQuery(() => {
   });
   $('#ghmotion_protection').prop('checked', s.protection).on('change', function () {
     s.protection = this.checked;
-    renderer?.setProtection?.(s.protection);
-    sim?.setOptions?.({ protection: s.protection });
     sceneEvents.setProtection(s.protection);
+    // Keep the model, cosmetic state, and checker aligned when protection is
+    // switched on/off mid-scene (including reactivating a new instance).
+    if (!s.protection && sim?.state?.cum) {
+      sim.state.cum.condom = 0;
+      sim.state.cum.condomCount = 0;
+    }
+    syncProtectionPresentation();
     refreshEventStatus();
     if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary').value);
     saveSettingsDebounced();
@@ -853,8 +883,7 @@ jQuery(() => {
   $('#ghmotion_reset').on('click', resetSceneCompletely);
   $('#ghmotion_break_protection').on('click', () => {
     if(sceneEvents.breakProtection('manual')) {
-      sim?.setOptions?.({protection:false});
-      renderer?.setProtection?.(settings().protection);
+      syncProtectionPresentation();
       updateStatus();
     }
   });
