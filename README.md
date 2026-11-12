@@ -1,3 +1,28 @@
+# Greyhaven Motion v0.1.15 — Event Ranges and Same-Turn Replay
+
+Based on the working v0.1.14 package. The **existing sim.js and renderMissionary.js are unchanged**.
+
+## Changes
+- In SillyTavern → Extensions → Greyhaven Motion → **Event timing (stroke ranges)**, adjust independent min/max ranges for motion-triggered protection failure, release-triggered protection failure, and the pre-fluid event. Defaults: 20–50, 0–10, and 1–100 respectively. The probability thresholds are adjustable in the existing Event probabilities panel.
+- When protection breaks, the event manager switches the *simulation logic* to unprotected while retaining the existing protection illustration and a clear `Protection: broken` status. This is a status/logic update, **not** an anatomical break animation or physical transfer of previously retained fluids.
+- The active hidden prompt clears after generation, but an in-memory copy is available only for a SillyTavern **swipe/regeneration of the same user turn**, including regeneration after deleting the previous assistant message. Sending another user message, switching chats, Reset, staging a new recording, or pressing Clear removes this replay copy.
+- The compact status indicator stays in place.
+
+## Scope/limitations
+- No graphic fluid or genital animation changes were made. Events are reflected in the existing status display and hidden chronological event summaries.
+- The extension stores replay data only in memory, not in the chat history. SillyTavern events `GENERATION_AFTER_COMMANDS`, `GENERATION_STARTED`, `MESSAGE_SENT`, `MESSAGE_DELETED`, `CHAT_CHANGED`, and `GENERATION_ENDED` are used to manage it.
+- For a fresh event range, enable protection again (for the protection thresholds) or press Reset (for the pre-fluid threshold). Existing scheduled event deadlines are not re-rolled mid-scene.
+
+## Regression tests
+- `node tests/event-manager.mjs`
+- `node tests/v015-range-replay.mjs`
+- `node tests/stage-a-follow-up.mjs`
+- `node tests/summary-regressions.mjs`
+
+## Important
+Make a backup of your working version before replacing the files. Use a normal ZIP where `manifest.json` and `index.js` are at the ZIP root. Existing extension storage is not deleted by the update.
+
+---
 # Greyhaven Motion — v0.1.13: Prompt Terminology + Configurable Limits
 
 This is a narrowly scoped follow-up to v0.1.12.

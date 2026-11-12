@@ -6,8 +6,28 @@ export const DEFAULT_RISKS = Object.freeze({
   release1: 10, release2: 30, release3: 40, release4: 60, release5: 80, release6: 90, release7: 100,
   preFluid: 80, preFluidDepth: 65,
 });
+export const DEFAULT_RANGES = Object.freeze({
+  motionMinStrokes: 20, motionMaxStrokes: 50,
+  releaseMinStrokes: 0, releaseMaxStrokes: 10,
+  preFluidMinStrokes: 1, preFluidMaxStrokes: 100,
+});
+const RANGE_LIMITS = Object.freeze({
+  motionMinStrokes: [0, 1000], motionMaxStrokes: [0, 1000],
+  releaseMinStrokes: [0, 1000], releaseMaxStrokes: [0, 1000],
+  preFluidMinStrokes: [1, 1000], preFluidMaxStrokes: [1, 1000],
+});
+function normalizeRanges(opts) {
+  for (const [key, [lo,hi]] of Object.entries(RANGE_LIMITS)) {
+    opts[key] = Math.floor(clamp(opts[key] ?? DEFAULT_RANGES[key], lo, hi));
+  }
+  for (const prefix of ['motion', 'release', 'preFluid']) {
+    const lo = `${prefix}MinStrokes`, hi = `${prefix}MaxStrokes`;
+    if (opts[lo] > opts[hi]) opts[hi] = opts[lo];
+  }
+}
 export function createEventManager({ random=Math.random, options={}, protectedInitially=false }={}) {
-  const opts = { ...DEFAULT_RISKS, ...options };
+  const opts = { ...DEFAULT_RISKS, ...DEFAULT_RANGES, ...options };
+  normalizeRanges(opts);
   let id = 0, seq = 0, reportedId=0, strokeCount=0, lastStrokeAt=null;
   let log=[];
   let protection=null, preFluid=null;
@@ -15,7 +35,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
   const roll=()=>clamp(random(),0,0.999999999);
   function emit(type,detail={}) { const e={id:++id, type, stroke:strokeCount, ...detail}; log.push(e); return e; }
   function makePreFluid() { preFluid={ eligible:true, yes:roll() < clamp(opts.preFluid,0,100)/100,
-    atStroke:randint(1,100), happened:false, depthAt:null, reachedDepth:false }; }
+    atStroke:randint(opts.preFluidMinStrokes,opts.preFluidMaxStrokes), happened:false, depthAt:null, reachedDepth:false }; }
   function newProtection() { protection={ active:true, broken:false, riskRoll:roll(), scheduled:null,
     strokes:0, releases:0, retainedReleases:0, failure:null }; preFluid=null; }
   function setProtection(enabled, record=true) {
@@ -25,7 +45,13 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
     if(record) emit(enabled ? 'protection-activated' : 'protection-removed');
     lastStrokeAt=null;
   }
-  function configure(patch={}) { Object.entries(patch).forEach(([k,v])=>{if(k in DEFAULT_RISKS)opts[k]=clamp(v,0,100);}); }
+  function configure(patch={}) {
+    Object.entries(patch).forEach(([k,v])=>{
+      if(k in DEFAULT_RISKS) opts[k]=clamp(v,0,100);
+      if(k in DEFAULT_RANGES) opts[k]=v;
+    });
+    normalizeRanges(opts);
+  }
   function reset(enabled=false) { seq++; log=[]; id=0; reportedId=0; strokeCount=0; lastStrokeAt=null;
     protection=null; preFluid=null; setProtection(enabled,false); }
   function schedule(cause, after) {
@@ -56,7 +82,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
       protection.strokes++;
       const eligible=clamp(opts[pace],0,100)/100;
       if(!protection.scheduled && protection.riskRoll<eligible) {
-        schedule(`motion:${pace}`,randint(20,50));
+        schedule(`motion:${pace}`,randint(opts.motionMinStrokes,opts.motionMaxStrokes));
       }
       if(protection.scheduled && protection.strokes>=protection.scheduled.target)
         breakProtection(protection.scheduled.cause);
@@ -82,7 +108,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
     if(!protection?.active || protection.broken) return false;
     protection.releases++; protection.retainedReleases++;
     const i=Math.min(protection.releases,7), chance=clamp(opts[`release${i}`],0,100)/100;
-    if (roll()<chance) schedule(`release:${i}`, i >= 7 ? 0 : randint(0,10));
+    if (roll()<chance) schedule(`release:${i}`, i >= 7 ? 0 : randint(opts.releaseMinStrokes,opts.releaseMaxStrokes));
     if(protection.scheduled?.target<=protection.strokes) breakProtection(protection.scheduled.cause);
     return !!protection.broken;
   }

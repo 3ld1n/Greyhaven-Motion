@@ -12,7 +12,8 @@ import { createSim, CENTERLINES } from './simFacade.js';
 import { SKIN_TONES, herTone, himTone } from './skins.js';
 import { buildSummary } from './summary.js';
 import { createMissionaryRenderer } from './renderMissionary.js';
-import { createEventManager, DEFAULT_RISKS, formatEventSummary } from './eventManager.js';
+import { createEventManager, DEFAULT_RISKS, DEFAULT_RANGES, formatEventSummary } from './eventManager.js';
+import { createPromptReplay } from './promptReplay.js';
 
 const MODULE = 'greyhaven_motion';
 const extension_prompt_types = { NONE: -1, IN_PROMPT: 0, IN_CHAT: 1, BEFORE_PROMPT: 2 };
@@ -53,6 +54,7 @@ const defaultSettings = {
   styleGuide: DEFAULT_STYLE_GUIDE,
   activeTab: 'actions',
   eventRisks: { ...DEFAULT_RISKS },
+  eventRanges: { ...DEFAULT_RANGES },
 };
 
 // Keep UI limits within the bounds already supported by the existing simulation.
@@ -94,6 +96,15 @@ function settings() {
   for (const [key,val] of Object.entries(DEFAULT_RISKS)) {
     const n = Number(s.eventRisks[key]);
     s.eventRisks[key] = Number.isFinite(n) ? Math.max(0,Math.min(100,n)) : val;
+  }
+  if (!s.eventRanges || typeof s.eventRanges !== 'object') s.eventRanges = { ...DEFAULT_RANGES };
+  for (const [key,val] of Object.entries(DEFAULT_RANGES)) {
+    const n=Number(s.eventRanges[key]);
+    s.eventRanges[key] = Number.isFinite(n) ? Math.max(key.startsWith('preFluid') ? 1 : 0, Math.min(1000, Math.floor(n))) : val;
+  }
+  for (const prefix of ['motion','release','preFluid']) {
+    const lo = `${prefix}MinStrokes`, hi = `${prefix}MaxStrokes`;
+    if (s.eventRanges[lo]>s.eventRanges[hi]) s.eventRanges[hi]=s.eventRanges[lo];
   }
   return s;
 }
@@ -224,6 +235,21 @@ function buildHiddenContext() {
   return String(s.giverName || '').trim() ? text.replaceAll('{{user}}', giver) : text;
 }
 
+// Identify the current user turn. Only a swipe/regeneration of this SAME turn
+// may inherit its previous hidden prompt. Switching chats or sending a new user
+// message invalidates replay to prevent context leaking across conversations.
+function currentTurnAnchor() {
+  const ctx=getContext();
+  const chat=Array.isArray(ctx.chat) ? ctx.chat : [];
+  let i=chat.length-1;
+  while(i>=0 && !chat[i]?.is_user) i--;
+  if(i<0) return null;
+  const msg=chat[i];
+  const chatKey=String(ctx.chatId ?? ctx.chat_id ?? ctx.chatFile ?? ctx.chat_file_name ?? 'current');
+  return JSON.stringify([chatKey,i,String(msg.send_date ?? ''),String(msg.mes ?? '')]);
+}
+const promptReplay = createPromptReplay();
+let replayAttempt = false;
 let injectionStaged = false;
 let stagedText = '';
 let recordMode = false;
@@ -231,7 +257,7 @@ let panelOpen = false;
 let sim = null, renderer = null, rafId = null;
 let liveStats = { depth: 0 };
 let pendingSnap = null;
-const sceneEvents = createEventManager({options:settings().eventRisks, protectedInitially:settings().protection});
+const sceneEvents = createEventManager({options:{...settings().eventRisks, ...settings().eventRanges}, protectedInitially:settings().protection});
 function refreshEventStatus() {
   const el=document.getElementById('ghmotion_event_status');
   if (!el) return;
@@ -261,10 +287,45 @@ function clearStagedPrompt() {
   updateStatus();
 }
 
+// Reapply only when SillyTavern is generating an alternative for the same
+// user message. GENERATION_AFTER_COMMANDS is early enough to influence prompt
+// assembly; GENERATION_STARTED is a second, idempotent safeguard.
+function restorePromptForAlternative(type) {
+  if (injectionStaged) return;
+  const cached=promptReplay.restore(type,currentTurnAnchor());
+  if(!cached) return;
+  replayAttempt=true;
+  stagePrompt(cached);
+}
+if (event_types.GENERATION_AFTER_COMMANDS) {
+  eventSource.on(event_types.GENERATION_AFTER_COMMANDS,restorePromptForAlternative);
+}
+if (event_types.GENERATION_STARTED) {
+  eventSource.on(event_types.GENERATION_STARTED,restorePromptForAlternative);
+}
+if (event_types.MESSAGE_SENT) {
+  eventSource.on(event_types.MESSAGE_SENT,()=>{
+    // A new actual user message ends the old reply's replay window.
+    promptReplay.newUserTurn();
+    replayAttempt=false;
+  });
+}
+if (event_types.MESSAGE_DELETED) {
+  eventSource.on(event_types.MESSAGE_DELETED,()=>promptReplay.deleted());
+}
+if (event_types.CHAT_CHANGED) {
+  eventSource.on(event_types.CHAT_CHANGED,()=>{
+    promptReplay.changeChat();
+    replayAttempt=false;
+    clearStagedPrompt();
+  });
+}
 eventSource.on(event_types.GENERATION_ENDED, () => {
   if (!injectionStaged) return;
-  sceneEvents.markReported();
+  if (!replayAttempt) sceneEvents.markReported();
+  promptReplay.remember(stagedText,currentTurnAnchor());
   clearStagedPrompt();
+  replayAttempt=false;
 });
 
 function stopAndStageRecording() {
@@ -276,6 +337,9 @@ function stopAndStageRecording() {
     session.pauseStart = null;
     session.lastActivityT = Math.max(session.lastActivityT, now);
   }
+  // A new, explicitly recorded event replaces the prior turn's swipe replay.
+  promptReplay.newUserTurn();
+  replayAttempt=false;
   const ctx = getContext();
   let text = buildHiddenContext();
   text = ctx.substituteParams ? ctx.substituteParams(text) : text;
@@ -408,7 +472,7 @@ function initGame() {
   renderer = createMissionaryRenderer(canvas);
   renderer.setSkin?.(herTone(s.skinHer), himTone(s.skinHim));
   renderer.setXray?.(s.xrayMode);
-  renderer.setProtection?.(s.protection && sceneEvents.status().protection !== 'broken');
+  renderer.setProtection?.(s.protection);
 
   let dragging = false, grabDepth = 0, grabScene = null;
   canvas.addEventListener('pointerdown', ev => {
@@ -433,7 +497,7 @@ function initGame() {
   sim.on('stroke', e => {
     touchSession(); session.strokes.push({ ...e, t: performance.now() / 1000 });
     const result = sceneEvents.onStroke(e, performance.now()/1000);
-    if (result.broken) { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(false); }
+    if (result.broken) { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(settings().protection); }
     updateStatus();
   });
   sim.on('deep', () => { touchSession(); session.deepHits++; });
@@ -451,7 +515,7 @@ function initGame() {
     touchSession();
     if (e.where === 'protected') {
       sceneEvents.onProtectedRelease();
-      if(sceneEvents.status().protection==='broken') { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(false); }
+      if(sceneEvents.status().protection==='broken') { sim?.setOptions?.({protection:false}); renderer?.setProtection?.(settings().protection); }
     }
     if (e.where === 'womb') session.cumWomb++; else if (e.where === 'vagina') session.cumVag++; else session.cumProtected++;
     updateStatus();
@@ -489,6 +553,8 @@ function initGame() {
 function resetSceneCompletely() {
   resetSession();
   clearStagedPrompt();
+  promptReplay.newUserTurn();
+  replayAttempt=false;
   sim?.setPierce(false);
   sim?.resetScene();
   sceneEvents.reset(settings().protection);
@@ -550,7 +616,19 @@ function mountSettingsPanel() {
         </div>
         <div class="ghmotion-settings-help">Speed risks use one preselected roll per protection instance; completion risks are separately rolled once per event. This is a fictional game mechanic, not real-world medical probability.</div>
       </details>
-      <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. The hidden summary auto-clears after the next generated reply.</div>
+      <details class="ghmotion-limits-details">
+        <summary>Event timing (stroke ranges)</summary>
+        <div class="ghmotion-settings-limits-grid">
+          ${[['motion','Protection: motion-triggered failure'],['release','Protection: release-triggered failure'],['preFluid','Pre-fluid event']].map(([prefix,label])=>`
+            <fieldset class="ghmotion-limit-pair">
+              <legend>${label}</legend>
+              <label><span>Minimum strokes</span><input class="text_pole" type="number" id="ghmotion_range_${prefix}_min" min="${prefix==='preFluid'?1:0}" max="1000" step="1"></label>
+              <label><span>Maximum strokes</span><input class="text_pole" type="number" id="ghmotion_range_${prefix}_max" min="${prefix==='preFluid'?1:0}" max="1000" step="1"></label>
+            </fieldset>`).join('')}
+        </div>
+        <div class="ghmotion-settings-help">Changes apply to newly enabled protection or the next scene reset. Stroke counts are independent of Record/Stop. A scheduled event keeps its existing deadline.</div>
+      </details>
+      <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. Hidden summaries replay only when regenerating the same reply, never on a new user turn.</div>
     </div>`;
   host.appendChild(wrap);
   const receiver = wrap.querySelector('#ghmotion_setting_receiver');
@@ -575,6 +653,25 @@ function mountSettingsPanel() {
       sceneEvents.configure({[key]:number});
       saveSettingsDebounced();
     });
+  }
+
+  for (const prefix of ['motion','release','preFluid']) {
+    const lo=`${prefix}MinStrokes`, hi=`${prefix}MaxStrokes`;
+    const lower=wrap.querySelector(`#ghmotion_range_${prefix}_min`);
+    const upper=wrap.querySelector(`#ghmotion_range_${prefix}_max`);
+    lower.value=s.eventRanges[lo]; upper.value=s.eventRanges[hi];
+    const onChange=(which)=>{
+      const floor=prefix==='preFluid'?1:0;
+      let min=Math.floor(clipNumber(lower.value,floor,1000,s.eventRanges[lo]));
+      let max=Math.floor(clipNumber(upper.value,floor,1000,s.eventRanges[hi]));
+      if(min>max) { if(which==='min') max=min; else min=max; }
+      s.eventRanges[lo]=min; s.eventRanges[hi]=max;
+      lower.value=min; upper.value=max;
+      sceneEvents.configure({[lo]:min,[hi]:max});
+      saveSettingsDebounced();
+    };
+    lower.addEventListener('change',()=>onChange('min'));
+    upper.addEventListener('change',()=>onChange('max'));
   }
 
   for (const spec of SCENE_LIMIT_SPECS) {
@@ -666,7 +763,7 @@ jQuery(() => {
             <button class="menu_button" id="ghmotion_clear">Clear staged</button>
           </div>
           <textarea id="ghmotion_summary" class="text_pole" rows="8" placeholder="Your hidden summary will appear here after you stop recording."></textarea>
-          <div class="ghmotion-help">This text stays hidden from the chat box and rides along only with your next sent message. It clears automatically after the reply is generated.</div>
+          <div class="ghmotion-help">The active prompt clears after generation but a private replay copy is kept for swipes or regeneration of the same reply only. Sending a new user message discards that copy.</div>
         </div>
       </div>
     </div>
@@ -757,11 +854,15 @@ jQuery(() => {
   $('#ghmotion_break_protection').on('click', () => {
     if(sceneEvents.breakProtection('manual')) {
       sim?.setOptions?.({protection:false});
-      renderer?.setProtection?.(false);
+      renderer?.setProtection?.(settings().protection);
       updateStatus();
     }
   });
-  $('#ghmotion_clear').on('click', clearStagedPrompt);
+  $('#ghmotion_clear').on('click', () => {
+    promptReplay.newUserTurn();
+    replayAttempt=false;
+    clearStagedPrompt();
+  });
   $('#ghmotion_preview_toggle').on('click', () => {
     activateTab('prompt');
   });
