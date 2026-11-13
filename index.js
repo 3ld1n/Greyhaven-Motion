@@ -57,6 +57,8 @@ const defaultSettings = {
   activeTab: 'actions',
   eventRisks: { ...DEFAULT_RISKS },
   eventRanges: { ...DEFAULT_RANGES },
+  autoPace: 0.9,
+  autoDepthStage: 2,
 };
 
 // Keep UI limits within the bounds already supported by the existing simulation.
@@ -109,8 +111,13 @@ function settings() {
     const lo = `${prefix}MinStrokes`, hi = `${prefix}MaxStrokes`;
     if (s.eventRanges[lo]>s.eventRanges[hi]) s.eventRanges[hi]=s.eventRanges[lo];
   }
+  s.autoPace = clipNumber(s.autoPace, 0.2, 2.0, defaultSettings.autoPace);
+  s.autoDepthStage = Math.max(0, Math.min(3, Math.floor(finiteNumber(s.autoDepthStage, defaultSettings.autoDepthStage))));
   return s;
 }
+
+const autoMotion = { enabled: false, phase: 0, pace: defaultSettings.autoPace, stage: defaultSettings.autoDepthStage };
+let refreshAutoControls = () => {};
 
 const session = {
   active: false,
@@ -412,6 +419,7 @@ function captureScene(fromSim) {
       releaseQueue: st.cum.releaseQueue ? {...st.cum.releaseQueue} : null,
     },
     response: st.response ? {...st.response} : null,
+    responseResidue: st.responseResidue ? {...st.responseResidue} : null,
     pierce: st.pierce,
     wombBroken: st.wombBroken,
     cervixHits: st.cervixHits,
@@ -435,6 +443,7 @@ function restoreScene(toSim, snap) {
   st.cum.releaseQueue = snap.cum.releaseQueue ? {...snap.cum.releaseQueue} : null;
   st.cum.particles = (snap.cum.particles || []).map(p => ({...p}));
   if (snap.response) st.response = {...snap.response};
+  if (snap.responseResidue) st.responseResidue = {...snap.responseResidue};
   st.wombBroken = !!snap.wombBroken;
   toSim.setPierce(snap.pierce);
   st.cervixHits = snap.cervixHits || 0;
@@ -448,11 +457,66 @@ function restoreScene(toSim, snap) {
   st.blood = snap.blood;
 }
 
+function getAutoRange(state, stage) {
+  const maxDepth = Math.max(4, state.maxDepth - 0.4);
+  const L = state.L;
+  switch (stage) {
+    case 0:
+      return { min: Math.max(state.MIN_DEPTH + 2.5, -4.5), max: Math.min(maxDepth, Math.max(3.2, L * 0.26)) };
+    case 1:
+      return { min: Math.max(-1.2, L * 0.08), max: Math.min(maxDepth, Math.max(7.5, L * 0.48)) };
+    case 2:
+      return { min: Math.max(0.8, L * 0.20), max: Math.min(maxDepth, Math.max(12, Math.min(state.MAX_NORMAL * 0.95, L * 0.78))) };
+    default:
+      return { min: Math.max(2, L * 0.42), max: Math.min(maxDepth, Math.max(L * 0.62, maxDepth * 0.96)) };
+  }
+}
+
+function applyAutoMotion(dt) {
+  if (!sim || !autoMotion.enabled) return;
+  autoMotion.pace = clipNumber(autoMotion.pace, 0.2, 2.0, defaultSettings.autoPace);
+  autoMotion.stage = Math.max(0, Math.min(3, Math.floor(autoMotion.stage)));
+  const range = getAutoRange(sim.state, autoMotion.stage);
+  autoMotion.phase = (autoMotion.phase + dt * autoMotion.pace * Math.PI * 2) % (Math.PI * 2);
+  const u = (1 - Math.cos(autoMotion.phase)) * 0.5;
+  sim.setTarget(range.min + (range.max - range.min) * u);
+}
+
+function setAutoEnabled(enabled) {
+  autoMotion.enabled = !!enabled;
+  refreshAutoControls();
+}
+
+function syncAutoSettings() {
+  const s = settings();
+  autoMotion.pace = s.autoPace;
+  autoMotion.stage = s.autoDepthStage;
+}
+
+function adjustAutoPace(delta) {
+  const s = settings();
+  s.autoPace = clipNumber((s.autoPace ?? defaultSettings.autoPace) + delta, 0.2, 2.0, defaultSettings.autoPace);
+  autoMotion.pace = s.autoPace;
+  saveSettingsDebounced();
+  refreshAutoControls();
+}
+
+function adjustAutoStage(delta) {
+  const s = settings();
+  s.autoDepthStage = Math.max(0, Math.min(3, Math.floor((s.autoDepthStage ?? defaultSettings.autoDepthStage) + delta)));
+  autoMotion.stage = s.autoDepthStage;
+  saveSettingsDebounced();
+  refreshAutoControls();
+}
+
+syncAutoSettings();
+
 function gameLoop(prev) {
   const now = performance.now();
   if (sim && renderer && panelOpen) {
     const dt = (now - prev) / 1000;
     try {
+      applyAutoMotion(dt);
       sim.update(dt);
       renderer.render(sim);
     } catch (err) {
@@ -479,6 +543,7 @@ function rebuildGame() {
 function initGame() {
   if (sim) return;
   const s = settings();
+  syncAutoSettings();
   const canvas = document.getElementById('ghmotion_canvas');
   sim = createSim({
     centerline: CENTERLINES.pov,
@@ -508,6 +573,7 @@ function initGame() {
 
   let dragging = false, grabDepth = 0, grabScene = null;
   canvas.addEventListener('pointerdown', ev => {
+    setAutoEnabled(false);
     dragging = true;
     canvas.setPointerCapture(ev.pointerId);
     grabScene = renderer.screenToScene(ev.clientX, ev.clientY);
@@ -792,6 +858,13 @@ jQuery(() => {
           <button class="menu_button" id="ghmotion_preview_toggle">Prompt</button>
           <button class="menu_button" id="ghmotion_reset">Reset</button>
           <button class="menu_button" id="ghmotion_break_protection">Break protection</button>
+          <button class="menu_button" id="ghmotion_auto_toggle">Auto: Off</button>
+          <button class="menu_button" id="ghmotion_auto_pace">Pace 0.9x</button>
+          <button class="menu_button" id="ghmotion_auto_depth">Depth 3/4</button>
+          <button class="menu_button" id="ghmotion_auto_slower">Slower</button>
+          <button class="menu_button" id="ghmotion_auto_faster">Faster</button>
+          <button class="menu_button" id="ghmotion_auto_shallower">Shallower</button>
+          <button class="menu_button" id="ghmotion_auto_deeper">Deeper</button>
         </div>
       </div>
       <div id="ghmotion_tab_scene" class="ghmotion-tab-panel">
@@ -922,6 +995,22 @@ jQuery(() => {
       updateStatus();
     }
   });
+  refreshAutoControls = () => {
+    const toggle = document.getElementById('ghmotion_auto_toggle');
+    const pace = document.getElementById('ghmotion_auto_pace');
+    const depth = document.getElementById('ghmotion_auto_depth');
+    if (toggle) toggle.textContent = `Auto: ${autoMotion.enabled ? 'On' : 'Off'}`;
+    if (pace) pace.textContent = `Pace ${autoMotion.pace.toFixed(1)}x`;
+    if (depth) depth.textContent = `Depth ${autoMotion.stage + 1}/4`;
+  };
+  refreshAutoControls();
+  $('#ghmotion_auto_toggle').on('click', safeAction(() => { setAutoEnabled(!autoMotion.enabled); }));
+  $('#ghmotion_auto_slower').on('click', safeAction(() => { adjustAutoPace(-0.1); }));
+  $('#ghmotion_auto_faster').on('click', safeAction(() => { adjustAutoPace(0.1); }));
+  $('#ghmotion_auto_shallower').on('click', safeAction(() => { adjustAutoStage(-1); }));
+  $('#ghmotion_auto_deeper').on('click', safeAction(() => { adjustAutoStage(1); }));
+  $('#ghmotion_auto_pace').on('click', safeAction(() => { adjustAutoPace(autoMotion.pace >= 2 ? -1.8 : 0.1); }));
+  $('#ghmotion_auto_depth').on('click', safeAction(() => { adjustAutoStage(autoMotion.stage >= 3 ? -3 : 1); }));
   $('#ghmotion_clear').on('click', () => {
     promptReplay.newUserTurn();
     replayAttempt=false;

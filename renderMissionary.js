@@ -184,7 +184,7 @@ export function createMissionaryRenderer(canvas) {
         ctx.lineTo(g.apex.x, g.apex.y);
         ctx.lineTo(g.rightBend.x, g.rightBend.y);
         ctx.lineWidth = 0.22;
-        ctx.strokeStyle = 'rgba(31,91,153,0.90)';
+        ctx.strokeStyle = 'rgba(86,156,215,0.88)';
         ctx.stroke();
     }
 
@@ -279,6 +279,53 @@ export function createMissionaryRenderer(canvas) {
         function traceEdge() {
             ctx.moveTo(edgePoints[0].x, edgePoints[0].y);
             for (let i = 1; i < edgePoints.length; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
+        }
+        function traceVisibleRim() {
+            const start = 3, end = edgePoints.length - 4;
+            ctx.moveTo(edgePoints[start].x, edgePoints[start].y);
+            for (let i = start + 1; i <= end; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
+        }
+        function drawEntranceBridge() {
+            const bridgeTopY = edgeY - edgeH - 0.98;
+            const bridgeBottomY = edgeY - edgeH + 0.10;
+            const bridgeOuterY = edgeY - 0.08;
+            ctx.beginPath();
+            ctx.moveTo(E.x - edgeW - 0.28, bridgeOuterY);
+            ctx.quadraticCurveTo(E.x - edgeW * 0.82, bridgeTopY + 0.16, E.x, bridgeTopY - 0.16);
+            ctx.quadraticCurveTo(E.x + edgeW * 0.82, bridgeTopY + 0.16, E.x + edgeW + 0.28, bridgeOuterY);
+            ctx.lineTo(E.x + edgeW * 0.70, bridgeBottomY);
+            ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.10, E.x - edgeW * 0.70, bridgeBottomY);
+            ctx.closePath();
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(E.x - edgeW * 0.64, edgeY - edgeH + 0.08);
+            ctx.quadraticCurveTo(E.x, edgeY - edgeH - 0.18, E.x + edgeW * 0.64, edgeY - edgeH + 0.08);
+            ctx.lineTo(E.x + edgeW * 0.46, edgeY - edgeH + 0.62);
+            ctx.quadraticCurveTo(E.x, edgeY - edgeH + 0.42, E.x - edgeW * 0.46, edgeY - edgeH + 0.62);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(145, 92, 108, 0.18)';
+            ctx.fill();
+        }
+        function drawEntranceRim() {
+            ctx.beginPath();
+            traceVisibleRim();
+            ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
+            ctx.lineWidth = 1.24;
+            ctx.stroke();
+        }
+        function drawRimSideOccluders() {
+            for (const sign of [1, -1]) {
+                const gap = sign === 1 ? st0.gapT : st0.gapB;
+                const nn = { x: n0.x * sign, y: n0.y * sign };
+                const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
+                const cx = E.x + nn.x * (gap + 0.78 - contraction) + out.x * 0.44;
+                const cy = E.y + nn.y * (gap + 0.78 - contraction) + out.y * 0.44;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, 1.05, 2.05, sign * 0.22, 0, Math.PI * 2);
+                ctx.fillStyle = PAL.skin;
+                ctx.fill();
+            }
         }
 
         // ==================== body layer (gets the jiggle wobble) ====================
@@ -822,25 +869,10 @@ export function createMissionaryRenderer(canvas) {
 
                 // Extra upper bridge of skin above the rim to cover the gap and hide the shaft
                 // immediately after it passes the rim. This sits above the shaft but under the rim line.
-                const bridgeTopY = edgeY - edgeH - 0.98;
-                const bridgeBottomY = edgeY - edgeH + 0.10;
-                const bridgeOuterY = edgeY - 0.08;
-                ctx.beginPath();
-                ctx.moveTo(E.x - edgeW - 0.28, bridgeOuterY);
-                ctx.quadraticCurveTo(E.x - edgeW * 0.82, bridgeTopY + 0.16, E.x, bridgeTopY - 0.16);
-                ctx.quadraticCurveTo(E.x + edgeW * 0.82, bridgeTopY + 0.16, E.x + edgeW + 0.28, bridgeOuterY);
-                ctx.lineTo(E.x + edgeW * 0.70, bridgeBottomY);
-                ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.10, E.x - edgeW * 0.70, bridgeBottomY);
-                ctx.closePath();
-                ctx.fillStyle = PAL.skin;
-                ctx.fill();
+                drawEntranceBridge();
 
                 // Exactly one rim line, drawn LAST. No second underlining shape.
-                ctx.beginPath();
-                traceEdge();
-                ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-                ctx.lineWidth = 1.24;
-                ctx.stroke();
+                drawEntranceRim();
             }
 
             // Redraw the navel above the non-xray cover so it never gets washed out.
@@ -948,6 +980,14 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
+        if (hasMadeContact) {
+            ctx.save();
+            ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
+            drawEntranceBridge();
+            drawEntranceRim();
+            ctx.restore();
+        }
+
         }
 
         // ==================== labia overlay ====================
@@ -967,6 +1007,11 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.55;
             ctx.stroke();
         }
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
+        drawRimSideOccluders();
         ctx.restore();
 
         // Gentle rhythmic highlight on the outer folds. Its intensity follows
@@ -1044,22 +1089,52 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
-        // Decorative spray for the optional stronger response. Both views
-        // reuse the same moving entrance point below the visible rim; the
-        // particles are never spawned behind a non-X-ray cover.
+        const residue = s.responseResidue || { thigh: 0, bed: 0 };
+        if (residue.thigh > 0.02) {
+            const wet = Math.min(1, residue.thigh);
+            ctx.save();
+            ctx.fillStyle = `rgba(219,244,253,${0.18 + wet * 0.22})`;
+            for (const sign of [-1, 1]) {
+                ctx.beginPath();
+                ctx.ellipse(E.x + sign * (8.5 + wet * 1.8), E.y + 10.6, 2.2 + wet * 1.3, 5.6 + wet * 1.9, sign * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(E.x + sign * (4.5 + wet * 1.1), E.y + 7.3, 1.0 + wet * 0.55, 2.4 + wet * 1.2, sign * 0.20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        if (residue.bed > 0.02) {
+            const wet = Math.min(1, residue.bed);
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(E.x, 58.1, 5.6 + wet * 4.2, 1.25 + wet * 0.85, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(219,244,253,${0.12 + wet * 0.16})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(E.x + 0.55, 57.95, 3.6 + wet * 2.1, 0.72 + wet * 0.38, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(252,250,255,${0.10 + wet * 0.10})`;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Decorative spray for the optional stronger response. It originates
+        // directly under the rim, opens slightly upward/outward, then falls.
         const sprayActive = !!s.response?.spray;
+        const spraySourceX = E.x + pelvisSway * 0.8;
+        const spraySourceY = edgeY - edgeH + 0.62 + pelvisBounce * 0.85;
         if (sprayActive) {
-            responseSpawnAcc += dt * (23 + responseStrength * 30);
-            while (responseSpawnAcc >= 1 && responseDrops.length < 100) {
+            responseSpawnAcc += dt * (28 + responseStrength * 40);
+            while (responseSpawnAcc >= 1 && responseDrops.length < 140) {
                 responseSpawnAcc--;
                 responseDrops.push({
-                    x: E.x + pelvisSway * 0.8 + (Math.random()-0.5) * 1.15,
-                    y: E.y + 2.15 + pelvisBounce * 0.85,
-                    vx: (Math.random()-0.5) * 19,
-                    vy: 4 + Math.random() * 16,
+                    x: spraySourceX + (Math.random()-0.5) * 0.9,
+                    y: spraySourceY + (Math.random()-0.5) * 0.25,
+                    vx: (Math.random()-0.5) * 28,
+                    vy: -6 + Math.random() * 11,
                     age: 0,
-                    life: 0.62 + Math.random() * 0.62,
-                    r: 0.23 + Math.random() * 0.17,
+                    life: 0.74 + Math.random() * 0.70,
+                    r: 0.28 + Math.random() * 0.20,
                 });
             }
         } else responseSpawnAcc = 0;
@@ -1070,13 +1145,14 @@ export function createMissionaryRenderer(canvas) {
                 responseDrops.splice(i,1);
                 continue;
             }
-            p.vy += 23 * dt;
+            p.vy += 24 * dt;
             p.x += p.vx * dt;
             p.y += p.vy * dt;
             const fade = Math.min(1, 1 - p.age / p.life);
+            const grow = 1 + 0.30 * (p.age / p.life);
             ctx.beginPath();
-            ctx.ellipse(p.x, p.y, p.r, p.r * 1.65, p.vx * 0.012, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(219,244,253,${0.76 * fade})`;
+            ctx.ellipse(p.x, p.y, p.r * grow, p.r * 1.75 * grow, p.vx * 0.012, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(219,244,253,${0.84 * fade})`;
             ctx.fill();
         }
     }

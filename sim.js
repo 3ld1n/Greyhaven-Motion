@@ -153,6 +153,7 @@ export function createSim(userOpts = {}) {
         maxDepth: MAX_N_EFF,
         cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false, duration: 1.8, travelFrom: null }, releaseQueue: null },
         response: { type: null, elapsed: 0, strength: 0, hold: false, active: false, spray: false },
+        responseResidue: { thigh: 0, bed: 0 },
         // --- resistance model (scene-persistent until resetScene) ---
         maxReach: 0,          // frontier: deepest point ever stretched this scene
         loose: 0,             // 0 untouched-tight .. 1 worked loose (cum = lube)
@@ -226,6 +227,7 @@ export function createSim(userOpts = {}) {
 
     function resetScene() {
         st.response = { type: null, elapsed: 0, strength: 0, hold: false, active: false, spray: false };
+        st.responseResidue = { thigh: 0, bed: 0 };
         resetFluids();
         st.maxReach = 0;
         st.loose = 0;
@@ -405,6 +407,10 @@ export function createSim(userOpts = {}) {
             st.response.active = next.active;
             st.response.spray = st.response.type === 'squirt' && next.spray;
         }
+        if (st.response.type === 'squirt') {
+            if (st.response.elapsed > 1.0) st.responseResidue.thigh = Math.min(1, st.responseResidue.thigh + dt * 0.58);
+            if (st.response.elapsed > 1.55) st.responseResidue.bed = Math.min(1, st.responseResidue.bed + dt * 0.42);
+        }
         // Temporary pulse affects the physics but never overwrites the user's
         // configured baseline. Once the envelope ends, exact baseline resumes.
         const currentTightness = opts.tightness + Math.max(0, (opts.responseTightnessMax ?? 2) - opts.tightness) * st.response.strength;
@@ -423,10 +429,21 @@ export function createSim(userOpts = {}) {
         const resistMul = st.forcing ? 0.06 : 1;
         const contactFrac = Math.max(0, Math.min(1, st.d / L));
         const grip = contactFrac * tight * resistMul;
+        const responseGrip = Math.max(0, Math.min(1, st.response?.strength || 0));
+        const withdrawing = st.dTarget < st.d - 0.04;
         let pull = k * (st.dTarget - st.d);
         if (pull > 0) pull /= (1 + 1.6 * grip); // pushing deeper takes real effort
+        if (responseGrip > 0 && !st.forcing) {
+            const chaseScale = withdrawing
+                ? Math.max(0.05, 1 - 0.88 * responseGrip)
+                : Math.max(0.16, 1 - 0.58 * responseGrip);
+            pull *= chaseScale;
+        }
         let force = pull;
         let extraDrag = 0; // barrier-overstretch molasses (hymen/cervix/womb)
+        if (responseGrip > 0 && !st.forcing) {
+            extraDrag += (withdrawing ? 230 : 120) * responseGrip * currentTightness;
+        }
         if (st.forcing && st.dTarget > st.d) force += 500;
 
         // 1) Entry gate: the lips resist the first push of the scene.

@@ -1,17 +1,19 @@
-# Greyhaven Motion v0.1.19 — Response Waves, Scene Counts & Sharper Tear
+# Greyhaven Motion v0.1.20 — Auto Motion, Rim/X-ray Fixes & Stronger Squirt Visuals
 
 ## What's new
-- **Sharp V protection opening:** removed the rounded tip-cap film outline across the torn region. The film cutout now uses a true angular V, with straight sides, a slight shoulder bend, and a 230 ms sideways-opening animation that remains at the moving tip. The cutout reveals the shaft pigment below the translucent film.
-- **Orgasm action:** the Actions tab has a new **Orgasm** button. Three short smooth tightening pulses are followed by one final peak held for **3 seconds**, then a smooth relaxation. Tightness rises toward the user's configurable maximum (currently 2× by default) without changing the saved baseline; both outer folds and the X-ray folds react in time with the same wave.
-- **Squirt action:** same timed response envelope with an additional brief decorative water-spray particle effect originating at the same entrance area in both views. The effect is independent of the existing fluid/release counters; particles have a bounded lifetime and a strict cap of 100.
-- **Scene-wide counts:** the event manager separately counts Orgasm and Squirt button presses, recording each event at the scene stroke number. These counts survive individual Record/Stop windows, protection changes and view switches. Only **Reset** clears them. One-time event descriptions are included on the next hidden summary, and cumulative totals are appended to subsequent summaries.
-- **60/120 Hz:** the existing physics-rate selector remains fully supported. The response envelope is driven by elapsed seconds, so switching physics rates does not change its timing.
-- **Unchanged:** initial body silhouette, prior protection/fluid mechanics, prompt replay, default UI settings, motion and detection probabilities.
+- **Automatic motion controls:** the Actions tab now includes **Auto**, **Pace**, **Depth**, plus quick **Slower/Faster** and **Shallower/Deeper** buttons. Auto motion drives the same target-depth system as manual dragging, so event tracking, stroke detection and resistance all keep working normally. Manual dragging turns Auto off immediately.
+- **Broken protection color tuning:** the darker inner split on the broken protection has been lightened so it stays visible without looking too dark against the rest of the film.
+- **X-ray entrance parity:** the X-ray view now gets the same rim/bridge treatment over the entrance gap as the non-X-ray view, while keeping the oval X-ray window. This adds the missing cover/depth feeling around the rim.
+- **Rim-edge masking:** the visible rim stroke is shortened and side occluders are drawn over it so the outer rim edges no longer peek out beyond the folds during fast pullbacks or contractions.
+- **Squirt spray update:** the spray now starts directly under the rim, spreads farther, includes a slight upward-outward launch before falling, and uses a higher capped particle budget for a fuller burst.
+- **Persistent wetness:** squirting can now leave visible wetness on the thighs and on the sheet after a short delay. That residue remains until **Reset**.
+- **Contraction resistance:** during response contractions, movement is intentionally more “stuck,” especially on pullback. Forward motion also slows slightly more, but less strongly than retreat, matching the requested feel.
+- **Scene-wide counts / 60–120 Hz:** all v0.1.19 response counting and fixed-step timing behavior remain intact.
 
 ## Notes and testing
-- `node tests/v019-response-waves.mjs` checks the wave envelope, last-peak hold, physics frame-rate independence, reset behavior, persistent counts, and the single sharp tear rendering path.
-- Run **all** `tests/*.mjs` to check regressions from previous releases; all seven suites passed during packaging.
-- `tests/visual-smoke-v019.html` is provided for an optional local browser smoke check. Headless Chromium could not complete a screenshot in the build environment; therefore final appearance must be reviewed in SillyTavern on the target device.
+- `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.
+- Run **all** `tests/*.mjs` to check regressions from previous releases; all eight suites passed during packaging.
+- `tests/visual-smoke-v019.html` is still available for an optional manual browser smoke check. Final appearance should still be reviewed in SillyTavern on the target device.
 - This is a stylized fictional simulation. Timing and visual effects are design choices, not claims about real physiology.
 
 **Install:** Back up the current extension folder, replace its files with this ZIP's root contents, then reload SillyTavern. Saved settings remain in SillyTavern and are not erased. Press Reset to start a clean test scene.
