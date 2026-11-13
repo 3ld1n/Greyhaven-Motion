@@ -1,4 +1,21 @@
-# Greyhaven Motion v0.1.27 — Local Fold Rebuild
+# Greyhaven Motion v0.1.28 — Sketch-Matched Fold Rebuild
+
+## What changed
+- **Restarted from the stable v0.1.23 base:** the new patch intentionally rebuilds the local fold detail from the earlier stable package instead of layering more fixes on top of the later experiments.
+- **Sketch-matched closed and open states:** the fold detail is redrawn to follow the three user-provided guide sketches, including the larger outer fold contours, hidden rest-state rim, center Y line in the closed state, and the taller open-state central hood/inner crease treatment.
+- **No whole-group bounce scaling:** the fold system now morphs by moving individual local contour pieces instead of enlarging/shrinking the whole detail block as one layer.
+- **Hidden legacy rim on the normal surface view:** the old surface rim/bridge stroke is no longer redrawn over the external view, so the redesigned folds can fully cover that area. X-ray still keeps its entrance bridge/rim treatment.
+- **Local cleanup cover:** a narrow skin-colored cover is added only around the fold roots to hide legacy thigh-line remnants beneath the new detail, without intentionally covering the shaft.
+
+## Verification
+- All ten automated Node tests still pass, including the v0.1.23 regression suite.
+- Final artistic matching should still be checked in SillyTavern on the intended device, because the build environment could not run a full visual browser review.
+
+**Installation:** back up the current extension, replace the files with this ZIP's root contents, reload SillyTavern, and press Reset for a clean visual check.
+
+---
+
+# Greyhaven Motion v0.1.23 — Fold Refinement, X-ray Cover & Visible Response Waves
 
 ## Repairs in this release
 - **Preserved approved thigh illustration:** the entire existing thigh outline path from v0.1.22 is unchanged, including the off-screen lower continuation. No new giver body art was introduced.
@@ -18,13 +35,12 @@
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **v0.1.27 fold-area rebuild:** replaces the previous fold attempt with a local body-attached reconstruction.
-- **Three explicit states:** closed/untouched, active inserted/opening, and wider spread/open states based on the user sketches.
-- **No icon-like scale bounce:** the fold geometry morphs locally instead of scaling one combined illustration.
-- **Hidden rim when closed:** the redesigned rim only appears during active/open states.
-- **Local skin seam mask:** covers older seam/outline remnants near the fold roots so duplicate thigh-line artifacts do not leak through.
-- **State-dependent Y detail:** the center Y-line is visible only in the closed state and fades during insertion/opening.
-- **Under-rim connector preserved:** the white triangle below the folds stays narrowed without altering the approved thighs/body baseline.
+- **Visual recovery from v0.1.21:** the taker body/thigh illustration has been restored to the stable **v0.1.20** visual base. The failed fold redesign and the experimental giver lower-body extension have both been removed.
+- **Off-screen lower continuation only:** the lower thigh continuation is now pushed farther below the frame so motion should no longer reveal a hard cut at the render-box edge. The visible thigh/body silhouette is otherwise unchanged.
+- **Squirt summary clarification:** squirt events now read as an intense orgasm with a squirting response, **spraying fluids outward**, which should help the chat distinguish them from a regular finish.
+- **Squirt also counts as orgasm:** pressing **Squirt** increments both the squirt counter and the orgasm counter while still logging a distinct squirt event.
+- **Response-wave thigh motion retained:** the existing thigh motion system now also reacts to orgasm/squirt contractions, without changing the base drawing style.
+- **Preserved v0.1.20 features:** auto motion controls, rim/X-ray bridge treatment, wetness buildup, contraction resistance, and the 60/120 Hz physics selector are all retained.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.
