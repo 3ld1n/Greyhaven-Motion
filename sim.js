@@ -149,7 +149,7 @@ export function createSim(userOpts = {}) {
         womb: { x: 0, y: 0, vx: 0, vy: 0 },  // womb's own jiggle offset
         pierce: false,                        // cervix penetration enabled
         maxDepth: MAX_N_EFF,
-        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false }, releaseQueue: null },
+        cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false, duration: 1.8, travelFrom: null }, releaseQueue: null },
         // --- resistance model (scene-persistent until resetScene) ---
         maxReach: 0,          // frontier: deepest point ever stretched this scene
         loose: 0,             // 0 untouched-tight .. 1 worked loose (cum = lube)
@@ -354,7 +354,9 @@ export function createSim(userOpts = {}) {
         if (fluid.preFluid?.active) return false;
         fluid.preFluid = {
             active: true, deep: !!reachedDepth, atDepth: depth,
-            animation: 1.5, transferred: false,
+            animation: reachedDepth ? 1.8 : 0, duration: 1.8,
+            transferred: false,
+            travelFrom: reachedDepth ? spinePoint(st.d) : null,
         };
         if (reachedDepth) {
             fluid.preFluid.atDepth = depth;
@@ -369,7 +371,9 @@ export function createSim(userOpts = {}) {
         if (!fluid.preFluid?.active || fluid.preFluid.deep) return false;
         fluid.preFluid.deep = true;
         fluid.preFluid.atDepth = depth;
-        fluid.preFluid.animation = 1.5;
+        fluid.preFluid.animation = 1.8;
+        fluid.preFluid.duration = 1.8;
+        fluid.preFluid.travelFrom = spinePoint(st.d);
         fluid.preFluid.transferred = false;
         fluid.vag = Math.max(0, fluid.vag - 0.018);
         emit('pre-fluid-visual-depth', { depth });
@@ -377,7 +381,7 @@ export function createSim(userOpts = {}) {
     }
 
     function resetFluids() {
-        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false }, releaseQueue: null };
+        st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false, duration: 1.8, travelFrom: null }, releaseQueue: null };
     }
 
     function step(dt) {
@@ -846,10 +850,16 @@ export function createSim(userOpts = {}) {
     updateMaxDepth(); // fresh scene: ceiling includes the overstretch zone
 
     let acc = 0;
+    let updateHz = Number(opts.updateHz) === 60 ? 60 : 120;
+    function setUpdateHz(nextHz) {
+        updateHz = Number(nextHz) === 60 ? 60 : 120;
+        // Keep the in-progress fixed-timestep accumulator bounded when switching.
+        acc = Math.min(acc, 1 / updateHz);
+    }
     function update(dt) {
-        dt = Math.min(dt, 1 / 30);
+        dt = Math.min(Math.max(0, dt), 1 / 30);
         acc += dt;
-        const h = 1 / 120;
+        const h = 1 / updateHz;
         while (acc >= h) { step(h); acc -= h; }
 
         // Rebuild spine samples for the renderer (tip -> base)
@@ -874,7 +884,7 @@ export function createSim(userOpts = {}) {
     return {
         state: st, update, setTarget, nudgeTarget, on, setOptions,
         setPierce, ejaculate, ruptureProtection, registerPreFluid, advancePreFluid,
-        slamToWomb, armBreak, resetFluids, resetScene, setVirgin,
+        slamToWomb, armBreak, resetFluids, resetScene, setVirgin, setUpdateHz,
         SCENE_W, SCENE_H,
     };
 }

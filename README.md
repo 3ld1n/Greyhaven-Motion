@@ -1,4 +1,18 @@
-# Greyhaven Motion v0.1.17 — Protection Failure Visual Parity
+# Greyhaven Motion v0.1.18 — Tear, Particle Continuity & 60/120 Hz Physics
+
+## v0.1.18 fixes
+- **One tip-attached protection tear:** the tear is drawn exactly once from the moving shaft tip in both views. The duplicate external overlay is gone. With the tip occluded in the external view, the tear is correctly hidden behind the body cover rather than floating at the entrance.
+- **Actual film cutout:** a small central opening is cut out of the blue protection film via the canvas even-odd fill rule so the already-rendered skin underneath is revealed. The two surrounding edges separate horizontally in a quick 240 ms animation, then remain open.
+- **Pre-fluid particle:** removed the extra local surface/folds effect, keeping a single same-sized bead on the moving tip until it crosses the configured depth. Its 1.8-second trip starts at that exact tip coordinate and finishes at exactly the lower-compartment final point; no initial or final teleport.
+- **Simulation physics rate setting:** choose **60 Hz (lower CPU)** or **120 Hz (original)** in SillyTavern Extensions > Greyhaven Motion > Motion update rate. Switching takes effect without resetting the scene; the selected rate is saved. Default remains 120 to preserve existing feel. The canvas continues to render at the browser/device's display frequency via `requestAnimationFrame`.
+- **Unchanged:** the illustration proportions, risk/event tracking, release replay, AI prompt replay, and existing scene settings.
+
+## Testing
+Run `node tests/v018-render-rate.mjs` for focused rendering-path, particle-continuity and 60/120 Hz regression checks. Run the other tests in `tests/` for prior releases. The visual appearance still needs checking in the iPhone/SillyTavern browser; automated tests cannot prove aesthetic accuracy.
+
+---
+
+# Previous release: v0.1.17 — Protection Failure Visual Parity
 
 Built directly on the working v0.1.15 package. All original controls, event percentages, ranges, prompt replay, and scene-level event tracking remain available.
 

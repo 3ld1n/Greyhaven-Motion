@@ -34,6 +34,8 @@ const defaultSettings = {
   receiverName: '',
   giverName: '',
   xrayMode: true,
+  // Physics steps/second, not the phone display refresh rate.
+  updateHz: 120,
   protection: false,
   virginMode: false,
   penisCm: 15.0,
@@ -92,6 +94,7 @@ function settings() {
   // Upgrade only the original built-in style guide, never a user's custom text.
   if (s.styleGuide === LEGACY_STYLE_GUIDE) s.styleGuide = DEFAULT_STYLE_GUIDE;
   normalizeSceneLimits(s);
+  s.updateHz = Number(s.updateHz) === 60 ? 60 : 120;
   if (!s.eventRisks || typeof s.eventRisks !== 'object') s.eventRisks = { ...DEFAULT_RISKS };
   for (const [key,val] of Object.entries(DEFAULT_RISKS)) {
     const n = Number(s.eventRisks[key]);
@@ -485,6 +488,7 @@ function initGame() {
     virgin: s.virginMode,
     blood: true,
     wombCapacity: 3,
+    updateHz: s.updateHz,
     protection: s.protection && sceneEvents.status().protection !== 'broken',
     penisInches: cmToInches(s.penisCm),
     maxDepthPct: s.maxDepthPct,
@@ -619,6 +623,10 @@ function mountSettingsPanel() {
       <div class="ghmotion-settings-grid">
         <label><span>Receiver name</span><input id="ghmotion_setting_receiver" class="text_pole" type="text" placeholder="{{char}}"></label>
         <label><span>Giver name</span><input id="ghmotion_setting_giver" class="text_pole" type="text" placeholder="{{user}}"></label>
+        <label><span>Motion update rate</span><select id="ghmotion_setting_update_hz" class="text_pole">
+          <option value="60">60 Hz · Lower CPU use</option>
+          <option value="120">120 Hz · Original precision</option>
+        </select></label>
         <label><span>Action preamble</span><textarea id="ghmotion_setting_preamble" class="text_pole" rows="3"></textarea></label>
         <label><span>Style guide</span><textarea id="ghmotion_setting_guide" class="text_pole" rows="4"></textarea></label>
       </div>
@@ -655,6 +663,7 @@ function mountSettingsPanel() {
         </div>
         <div class="ghmotion-settings-help">Changes apply to newly enabled protection or the next scene reset. Stroke counts are independent of Record/Stop. A scheduled event keeps its existing deadline.</div>
       </details>
+      <div class="ghmotion-settings-help">Motion update rate controls simulation physics steps, not your screen FPS. The canvas already follows your device's display refresh rate. Switching takes effect immediately without resetting the scene.</div>
       <div class="ghmotion-settings-help">You can use <code>{{receiver}}</code> and <code>{{giver}}</code> in the style guide. Hidden summaries replay only when regenerating the same reply, never on a new user turn.</div>
     </div>`;
   host.appendChild(wrap);
@@ -666,6 +675,13 @@ function mountSettingsPanel() {
   giver.value = s.giverName || '';
   preamble.value = s.actionPreamble || DEFAULT_ACTION_PREAMBLE;
   guide.value = s.styleGuide || DEFAULT_STYLE_GUIDE;
+  const hzSelect = wrap.querySelector('#ghmotion_setting_update_hz');
+  hzSelect.value = String(s.updateHz);
+  hzSelect.addEventListener('change', () => {
+    s.updateHz = Number(hzSelect.value) === 60 ? 60 : 120;
+    sim?.setUpdateHz?.(s.updateHz);
+    saveSettingsDebounced();
+  });
   receiver.addEventListener('input', () => { s.receiverName = receiver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   giver.addEventListener('input', () => { s.giverName = giver.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
   preamble.addEventListener('input', () => { s.actionPreamble = preamble.value; saveSettingsDebounced(); if (injectionStaged) stagePrompt(document.getElementById('ghmotion_summary')?.value || stagedText); });
