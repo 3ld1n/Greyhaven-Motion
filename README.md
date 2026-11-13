@@ -1,14 +1,13 @@
-# Greyhaven Motion v0.1.20 — Auto Motion, Rim/X-ray Fixes & Stronger Squirt Visuals
+# Greyhaven Motion v0.1.21 — Visual Refresh & Response Polish
 
 ## What's new
-- **Automatic motion controls:** the Actions tab now includes **Auto**, **Pace**, **Depth**, plus quick **Slower/Faster** and **Shallower/Deeper** buttons. Auto motion drives the same target-depth system as manual dragging, so event tracking, stroke detection and resistance all keep working normally. Manual dragging turns Auto off immediately.
-- **Broken protection color tuning:** the darker inner split on the broken protection has been lightened so it stays visible without looking too dark against the rest of the film.
-- **X-ray entrance parity:** the X-ray view now gets the same rim/bridge treatment over the entrance gap as the non-X-ray view, while keeping the oval X-ray window. This adds the missing cover/depth feeling around the rim.
-- **Rim-edge masking:** the visible rim stroke is shortened and side occluders are drawn over it so the outer rim edges no longer peek out beyond the folds during fast pullbacks or contractions.
-- **Squirt spray update:** the spray now starts directly under the rim, spreads farther, includes a slight upward-outward launch before falling, and uses a higher capped particle budget for a fuller burst.
-- **Persistent wetness:** squirting can now leave visible wetness on the thighs and on the sheet after a short delay. That residue remains until **Reset**.
-- **Contraction resistance:** during response contractions, movement is intentionally more “stuck,” especially on pullback. Forward motion also slows slightly more, but less strongly than retreat, matching the requested feel.
-- **Scene-wide counts / 60–120 Hz:** all v0.1.19 response counting and fixed-step timing behavior remain intact.
+- **Squirt summary clarification:** squirt events are now worded as an intense orgasm with a squirting response, **spraying fluids outward**, so the chat is less likely to interpret them as a regular finish.
+- **Squirt also counts as orgasm:** pressing **Squirt** now increments both the squirt counter and the orgasm counter, while still logging a distinct squirt event.
+- **Response-wave thigh motion:** the same thigh motion system used during strokes now also reacts to orgasm/squirt contractions, so the lower body visibly answers the wave pattern instead of only the folds.
+- **Connected fold redesign:** the old floating oval fold overlays have been replaced with connected fold shapes. Their outer edges stay attached to the thigh-side body outline, there is no separate upper fold cap line, and their inner edges deform smoothly from a tighter `)(` shape toward a rounder `()` opening during motion and contractions.
+- **Improved layer order:** a small giver lower-body/pelvis layer is now drawn above the taker thighs so the shaft feels visually connected from the POV angle without collision artifacts.
+- **Extended lower view:** the visible scene height is taller and the thigh/knee area extends farther downward, while keeping the overall thigh/body proportions the same.
+- **Preserved v0.1.20 features:** auto motion controls, rim/X-ray bridge treatment, wetness buildup, contraction resistance, and the 60/120 Hz physics selector are all retained.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.

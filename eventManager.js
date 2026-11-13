@@ -117,8 +117,13 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
   }
   function recordResponse(type='orgasm') {
     const kind=type==='squirt'?'squirt':'orgasm';
-    responses[kind]++;
-    return emit(kind,{count:responses[kind]});
+    if(kind==='squirt') {
+      responses.squirt++;
+      responses.orgasm++;
+      return emit(kind,{count:responses.squirt, orgasmCount: responses.orgasm});
+    }
+    responses.orgasm++;
+    return emit(kind,{count:responses.orgasm});
   }
   function pending() { return log.filter(e=>e.id>reportedId).map(e=>({...e})); }
   function markReported(){reportedId=id;}
@@ -139,7 +144,7 @@ export function formatEventSummary(events, status) {
     if(e.type==='pre-fluid') lines.push(`pre-ejaculate event on scene stroke ${e.stroke} at approximately ${Math.round(e.atDepth*100)}% relative depth`);
     if(e.type==='pre-fluid-depth-changed') lines.push(`after the earlier fluid event, the scene reached approximately ${Math.round(e.atDepth*100)}% relative depth`);
     if(e.type==='orgasm') lines.push(`{{receiver}} had an orgasm at scene stroke ${e.stroke}`);
-    if(e.type==='squirt') lines.push(`{{receiver}} had an intense orgasm at scene stroke ${e.stroke}, with a squirting response`);
+    if(e.type==='squirt') lines.push(`{{receiver}} had an intense orgasm at scene stroke ${e.stroke}, with a squirting response, spraying fluids outward`);
   }
   if(status.protection==='broken') lines.push('current protection state: broken');
   if(status.responseCounts && (status.responseCounts.orgasm || status.responseCounts.squirt))
