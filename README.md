@@ -1,17 +1,16 @@
-# Greyhaven Motion v0.1.21 — Visual Refresh & Response Polish
+# Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **Squirt summary clarification:** squirt events are now worded as an intense orgasm with a squirting response, **spraying fluids outward**, so the chat is less likely to interpret them as a regular finish.
-- **Squirt also counts as orgasm:** pressing **Squirt** now increments both the squirt counter and the orgasm counter, while still logging a distinct squirt event.
-- **Response-wave thigh motion:** the same thigh motion system used during strokes now also reacts to orgasm/squirt contractions, so the lower body visibly answers the wave pattern instead of only the folds.
-- **Connected fold redesign:** the old floating oval fold overlays have been replaced with connected fold shapes. Their outer edges stay attached to the thigh-side body outline, there is no separate upper fold cap line, and their inner edges deform smoothly from a tighter `)(` shape toward a rounder `()` opening during motion and contractions.
-- **Improved layer order:** a small giver lower-body/pelvis layer is now drawn above the taker thighs so the shaft feels visually connected from the POV angle without collision artifacts.
-- **Extended lower view:** the visible scene height is taller and the thigh/knee area extends farther downward, while keeping the overall thigh/body proportions the same.
+- **Visual recovery from v0.1.21:** the taker body/thigh illustration has been restored to the stable **v0.1.20** visual base. The failed fold redesign and the experimental giver lower-body extension have both been removed.
+- **Off-screen lower continuation only:** the lower thigh continuation is now pushed farther below the frame so motion should no longer reveal a hard cut at the render-box edge. The visible thigh/body silhouette is otherwise unchanged.
+- **Squirt summary clarification:** squirt events now read as an intense orgasm with a squirting response, **spraying fluids outward**, which should help the chat distinguish them from a regular finish.
+- **Squirt also counts as orgasm:** pressing **Squirt** increments both the squirt counter and the orgasm counter while still logging a distinct squirt event.
+- **Response-wave thigh motion retained:** the existing thigh motion system now also reacts to orgasm/squirt contractions, without changing the base drawing style.
 - **Preserved v0.1.20 features:** auto motion controls, rim/X-ray bridge treatment, wetness buildup, contraction resistance, and the 60/120 Hz physics selector are all retained.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.
-- Run **all** `tests/*.mjs` to check regressions from previous releases; all eight suites passed during packaging.
+- Run **all** `tests/*.mjs` to check regressions from previous releases; all nine suites passed during packaging.
 - `tests/visual-smoke-v019.html` is still available for an optional manual browser smoke check. Final appearance should still be reviewed in SillyTavern on the target device.
 - This is a stylized fictional simulation. Timing and visual effects are design choices, not claims about real physiology.
 

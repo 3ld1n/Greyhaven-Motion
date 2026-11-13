@@ -117,7 +117,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
   }
   function recordResponse(type='orgasm') {
     const kind=type==='squirt'?'squirt':'orgasm';
-    if(kind==='squirt') {
+    if (kind === 'squirt') {
       responses.squirt++;
       responses.orgasm++;
       return emit(kind,{count:responses.squirt, orgasmCount: responses.orgasm});

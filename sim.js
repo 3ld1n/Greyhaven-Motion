@@ -7,7 +7,7 @@
 import { sampleResponseWave } from './responseWave.js';
 
 const SCENE_W = 100;
-const SCENE_H = 66;
+const SCENE_H = 60;
 
 // Default canal centerline (side view): from entrance (lower right) up-left.
 // Each view supplies its own centerline; the rest of the sim is view-agnostic.

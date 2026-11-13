@@ -321,85 +321,13 @@ export function createMissionaryRenderer(canvas) {
                 const gap = sign === 1 ? st0.gapT : st0.gapB;
                 const nn = { x: n0.x * sign, y: n0.y * sign };
                 const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
-                const cx = E.x + nn.x * (gap + 0.58 - contraction) + out.x * 0.40;
-                const cy = E.y + nn.y * (gap + 0.58 - contraction) + out.y * 0.40;
+                const cx = E.x + nn.x * (gap + 0.78 - contraction) + out.x * 0.44;
+                const cy = E.y + nn.y * (gap + 0.78 - contraction) + out.y * 0.44;
                 ctx.beginPath();
-                ctx.ellipse(cx, cy, 0.98, 1.92, sign * 0.22, 0, Math.PI * 2);
+                ctx.ellipse(cx, cy, 1.05, 2.05, sign * 0.22, 0, Math.PI * 2);
                 ctx.fillStyle = PAL.skin;
                 ctx.fill();
             }
-        }
-        function drawConnectedFolds() {
-            const responseStrength = Math.max(0, s.response?.strength || 0);
-            const travel = s.response?.hold ? 1 : 0.72 + 0.28 * Math.sin((s.response?.elapsed || 0) * 15.5);
-            const contraction = responseStrength * travel;
-            const innerPinch = 1.10 + contraction * 1.35 + openingSpread * 0.18;
-            const lowerSpread = 2.85 - contraction * 0.52;
-            const topLift = 0.18 + contraction * 0.16;
-            const topW = 2.55;
-            const yTop = 34.95;
-            const yMid = 38.35;
-            const yBot = 44.9;
-            const bridgeY = 47.1;
-            const topInset = contraction * 0.22;
-            for (const sign of [-1, 1]) {
-                const xOuterTop = 49 + sign * (topW + topInset);
-                const xOuterMid = 49 + sign * (7.7 + Math.max(0, thighLag * sign) * 0.22);
-                const xOuterBot = 49 + sign * (15.0 + Math.abs(thighPulse) * 0.12);
-                const xInnerTop = 49 + sign * (1.05 + contraction * 0.20);
-                const xInnerMid = 49 + sign * (innerPinch + 0.10 * sign * thighLag);
-                const xInnerBot = 49 + sign * lowerSpread;
-                ctx.beginPath();
-                ctx.moveTo(xOuterTop, yTop);
-                ctx.quadraticCurveTo(xOuterMid, 36.1 - topLift, xOuterBot, yBot);
-                ctx.quadraticCurveTo(49 + sign * 8.2, 46.6 - contraction * 0.18, xInnerBot, bridgeY);
-                ctx.quadraticCurveTo(xInnerMid, 42.0 - contraction * 0.55, xInnerTop, yMid);
-                ctx.quadraticCurveTo(49 + sign * 1.9, 36.5 - topLift, xOuterTop, yTop);
-                ctx.closePath();
-                ctx.fillStyle = PAL.skin;
-                ctx.fill();
-
-                // stroke only the visible outer and lower contour — no top outline cap.
-                ctx.beginPath();
-                ctx.moveTo(xOuterTop, yTop + 0.02);
-                ctx.quadraticCurveTo(xOuterMid, 36.1 - topLift, xOuterBot, yBot);
-                ctx.quadraticCurveTo(49 + sign * 8.2, 46.6 - contraction * 0.18, xInnerBot, bridgeY);
-                ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.85;
-                ctx.stroke();
-
-                // smooth inner fold line that changes from )( to ().
-                ctx.beginPath();
-                ctx.moveTo(xInnerTop, yMid - 0.2);
-                ctx.quadraticCurveTo(49 + sign * (0.58 + contraction * 0.06), 39.2 - topLift, xInnerMid, 42.15 - contraction * 0.55);
-                ctx.quadraticCurveTo(49 + sign * 1.95, 45.3 - contraction * 0.24, xInnerBot, bridgeY - 0.15);
-                ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.62;
-                ctx.stroke();
-            }
-        }
-
-        function drawGiverLowerBody() {
-            ctx.beginPath();
-            ctx.moveTo(42.2, 60.0);
-            ctx.quadraticCurveTo(42.8, 56.8, 44.3, 54.7);
-            ctx.quadraticCurveTo(46.1, 52.4, 47.2, 50.5);
-            ctx.quadraticCurveTo(48.15, 49.0, 49.0, 49.0);
-            ctx.quadraticCurveTo(49.85, 49.0, 50.8, 50.5);
-            ctx.quadraticCurveTo(51.9, 52.4, 53.7, 54.7);
-            ctx.quadraticCurveTo(55.3, 56.8, 55.8, 60.0);
-            ctx.closePath();
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-            ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.85;
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(49.0, 49.0);
-            ctx.quadraticCurveTo(49.0, 53.0, 49.0, 58.3);
-            ctx.strokeStyle = 'rgba(178, 90, 114, 0.12)';
-            ctx.lineWidth = 0.45;
-            ctx.stroke();
         }
 
         // ==================== body layer (gets the jiggle wobble) ====================
@@ -418,7 +346,7 @@ export function createMissionaryRenderer(canvas) {
         winRy = 16.5 + wombEff * 0.9 + Math.min(4, s.cervixOff * 0.5) + lenExtra / 2; // grows when the womb is shoved deep
         winShift = lenExtra / 2;
 
-        // Torso column background. A separate giver lower-body layer is drawn later above the taker thighs.
+        // Torso column (drawn first — the thighs overlap it from the front)
         torsoPath(belly);
         ctx.fillStyle = PAL.skin;
         ctx.fill();
@@ -442,6 +370,8 @@ export function createMissionaryRenderer(canvas) {
         ctx.fillStyle = 'rgba(178, 90, 114, 0.55)';
         ctx.fill();
 
+        // Thighs IN FRONT of the torso: restore the more human, softer v0.1.3 leg silhouettes,
+        // while keeping eased motion so contact does not pop or teleport.
         for (const m of [1, -1]) {
             const X = v => 49.5 + m * (v - 49.5);
             const hipX = X(38.2);
@@ -460,12 +390,17 @@ export function createMissionaryRenderer(canvas) {
             ctx.beginPath();
             ctx.moveTo(X(37), 35.0);
             ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
-            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 66.2);
-            ctx.lineTo(X(30), 66.2);
-            ctx.quadraticCurveTo(X(42), 61.2 - thighPulse * 0.14, X(47.6), 55.2 - thighPulse * 0.15 - thighLag * m * 0.10);
-            ctx.quadraticCurveTo(X(49.25), 53.3 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 51.9 - innerPinch);
-            ctx.quadraticCurveTo(X(46.2), 46.7 - thighPulse * 0.07, X(41.6), 41.8 - thighPulse * 0.05);
-            ctx.quadraticCurveTo(X(39.2), 36.8, X(37), 35.0);
+            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 63);
+            // Extend the lower continuation well below the visible frame so movement
+            // does not reveal a hard cut at the render-box edge, while keeping the
+            // visible thigh/body silhouette identical to the previous good version.
+            ctx.lineTo(X(-4), 73.5);
+            ctx.lineTo(X(31.5), 73.5);
+            ctx.lineTo(X(30), 63);
+            ctx.quadraticCurveTo(X(42), 58.0 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
+            ctx.quadraticCurveTo(X(49.25), 50.1 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 48.9 - innerPinch);
+            ctx.quadraticCurveTo(X(46.2), 43.7 - thighPulse * 0.07, X(41.6), 39.6 - thighPulse * 0.05);
+            ctx.quadraticCurveTo(X(39.2), 36.6, X(37), 35.0);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
@@ -474,11 +409,6 @@ export function createMissionaryRenderer(canvas) {
             ctx.stroke();
             ctx.restore();
         }
-
-        ctx.save();
-        ctx.translate(pelvisSway * 0.2, pelvisBounce * 0.2);
-        drawGiverLowerBody();
-        ctx.restore();
 
 
 
@@ -1067,26 +997,46 @@ export function createMissionaryRenderer(canvas) {
 
         }
 
-        // ==================== connected fold overlay ====================
+        // ==================== labia overlay ====================
         ctx.save();
         ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-        drawConnectedFolds();
+        for (const sign of [1, -1]) {
+            const gap = sign === 1 ? st0.gapT : st0.gapB;
+            const nn = { x: n0.x * sign, y: n0.y * sign };
+            const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
+            const cx = E.x + nn.x * (gap + 0.7 - contraction) + out.x * 0.4;
+            const cy = E.y + nn.y * (gap + 0.7 - contraction) + out.y * 0.4;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 1.7, 3.1, sign * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
+            ctx.strokeStyle = PAL.skinLine;
+            ctx.lineWidth = 0.55;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
         drawRimSideOccluders();
         ctx.restore();
 
-        // Gentle rhythmic highlight on the inner fold edge only.
+        // Gentle rhythmic highlight on the outer folds. Its intensity follows
+        // the same physical wave as the temporary tightening; no independent
+        // oscillator can drift out of phase.
         const responseStrength = Math.max(0, s.response?.strength || 0);
         if (responseStrength > 0.05) {
             ctx.save();
             ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-            const contraction = responseStrength * (s.response?.hold ? 1 : 0.72 + 0.28 * Math.sin((s.response?.elapsed || 0) * 15.5));
-            for (const sign of [-1, 1]) {
+            for (const m of [-1, 1]) {
+                const nn = {x: n0.x * m, y: n0.y * m};
+                const gap = m === 1 ? st0.gapT : st0.gapB;
+                const c = { x: E.x + nn.x * (gap + 1.55 - responseStrength * 0.9) + out.x * 0.4,
+                            y: E.y + nn.y * (gap + 1.55 - responseStrength * 0.9) + out.y * 0.4 };
                 ctx.beginPath();
-                ctx.moveTo(49 + sign * (1.0 + contraction * 0.20), 38.2);
-                ctx.quadraticCurveTo(49 + sign * (0.55 + contraction * 0.05), 39.2, 49 + sign * (1.15 + contraction * 1.22), 42.1 - contraction * 0.55);
-                ctx.quadraticCurveTo(49 + sign * 1.95, 45.3 - contraction * 0.24, 49 + sign * (2.85 - contraction * 0.52), 46.95);
-                ctx.strokeStyle = `rgba(255,235,240,${0.14 + responseStrength * 0.24})`;
-                ctx.lineWidth = 0.25;
+                ctx.ellipse(c.x, c.y, 0.34, 1.30, m * 0.22, -0.9, 0.9);
+                ctx.strokeStyle = `rgba(255,235,240,${0.14 + responseStrength * 0.27})`;
+                ctx.lineWidth = 0.27;
                 ctx.stroke();
             }
             ctx.restore();
