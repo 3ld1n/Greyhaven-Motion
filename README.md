@@ -1,3 +1,20 @@
+# Greyhaven Motion v0.1.23 — Fold Refinement, X-ray Cover & Visible Response Waves
+
+## Repairs in this release
+- **Preserved approved thigh illustration:** the entire existing thigh outline path from v0.1.22 is unchanged, including the off-screen lower continuation. No new giver body art was introduced.
+- **Visible thigh response waves:** the response button now drives the same already-present thigh motion transforms as ordinary movement, even when the scene is near 0% depth. The second oscillation that could suppress movement at the response peak has been removed; both the quick waves and final hold now have a coherent smooth effect.
+- **Refined small folds:** replaced the separate floating oval overlays with two small continuous skin-colored folds, with no outlined top cap. Their inner contours gently deform with opening/contraction; the outer curves remain anchored by the shared pelvis transform. A subtle pointed darker insert sits underneath, and the left fold is drawn last so its outline is preserved.
+- **X-ray rim/depth at rest:** the existing entrance skin bridge and rim are now drawn in X-ray mode even before contact, rather than disappearing until insertion. The main oval cutaway retains its dimensions and position.
+- **Preserved:** protection effects, previous release animations, scene-level event manager, summary/count improvements, giver auto mode, persistent wetness and 60/120 Hz physics setting.
+
+## Verification
+- All ten automated Node tests passed, including `tests/v023-fold-wave-xray.mjs`, which verifies the rim at 0% depth in X-ray, visible response-induced leg rotation without contact, and the exact approved thigh path via a stable hash.
+- Final artistic appearance and animation smoothness should be checked inside SillyTavern on the intended phone. The headless-browser screenshot attempt stalled and is not counted as a successful visual review.
+
+**Installation:** Keep a backup of v0.1.22, replace the extension files using this ZIP (at root), reload SillyTavern, and use Reset for a fresh visual test. Saved settings remain in SillyTavern.
+
+---
+
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new

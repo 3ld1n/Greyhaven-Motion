@@ -254,9 +254,18 @@ export function createMissionaryRenderer(canvas) {
         const pelvisSway = disp.pelvisX;
         const pelvisBounce = disp.pelvisY;
         const responseStrengthNow = Math.max(0, s.response?.strength || 0);
-        const responseWaveThigh = responseStrengthNow * (s.response?.hold ? 0.80 : (0.45 + 0.55 * Math.sin((s.response?.elapsed || 0) * 15.5)));
-        const targetThighPulse = Math.max(-1.0, Math.min(1.0, motionContact * (s.dVel * 0.015) + responseWaveThigh * 0.26));
-        const targetThighLag = Math.max(-0.68, Math.min(0.68, motionContact * (s.jig.x * 0.10 - s.dVel * 0.0038)));
+        // The response envelope already contains quick pulses. Do not add a
+        // second sine wave: its negative phase cancelled visible leg motion.
+        const responseWaveThigh = responseStrengthNow;
+        // Reuse the existing thigh transforms during response waves, even when the
+        // scene is at rest. In v0.1.22 the 0.26 gain and motionContact gating
+        // made the visible movement effectively imperceptible at low depth.
+        const responseLegMotion = Math.max(0, Math.min(1, responseWaveThigh));
+        const legMotion = Math.max(motionContact, responseLegMotion);
+        const targetThighPulse = Math.max(-1.0, Math.min(1.0,
+            motionContact * (s.dVel * 0.015) + responseLegMotion * 0.92));
+        const targetThighLag = Math.max(-0.68, Math.min(0.68,
+            motionContact * (s.jig.x * 0.10 - s.dVel * 0.0038)));
         disp.thighL = ease(disp.thighL, targetThighPulse + targetThighLag * 0.55, 9);
         disp.thighR = ease(disp.thighR, targetThighPulse - targetThighLag * 0.55, 9);
         const thighPulse = (disp.thighL + disp.thighR) * 0.5;
@@ -376,10 +385,10 @@ export function createMissionaryRenderer(canvas) {
             const X = v => 49.5 + m * (v - 49.5);
             const hipX = X(38.2);
             const hipY = 35.6;
-            const legLift = motionContact * (0.08 + Math.max(0, -thighPulse) * 0.18 + (m === 1 ? 0.04 : 0));
-            const legRot = motionContact * (m * (0.035 + Math.max(-0.04, Math.min(0.04, thighLag * 0.045))) + thighPulse * 0.018);
-            const legScaleX = 1 + motionContact * (0.015 + Math.abs(thighLag) * 0.018 + (m === 1 ? 0.008 : 0));
-            const legScaleY = 1 - motionContact * (0.012 + Math.abs(thighPulse) * 0.012) + Math.max(0, thighPulse) * 0.015;
+            const legLift = legMotion * (0.08 + Math.max(0, -thighPulse) * 0.18 + (m === 1 ? 0.04 : 0));
+            const legRot = legMotion * (m * (0.035 + Math.max(-0.04, Math.min(0.04, thighLag * 0.045))) + thighPulse * 0.018);
+            const legScaleX = 1 + legMotion * (0.015 + Math.abs(thighLag) * 0.018 + (m === 1 ? 0.008 : 0));
+            const legScaleY = 1 - legMotion * (0.012 + Math.abs(thighPulse) * 0.012) + Math.max(0, thighPulse) * 0.015;
             const innerPinch = openingSpread * 0.55 + motionVel * 0.18;
             ctx.save();
             ctx.translate(hipX, hipY);
@@ -987,60 +996,86 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
-        if (hasMadeContact) {
-            ctx.save();
-            ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-            drawEntranceBridge();
-            drawEntranceRim();
-            ctx.restore();
-        }
-
-        }
-
-        // ==================== labia overlay ====================
+        // Keep the entrance depth/cover visible in X-ray even at zero depth.
+        // Previously hasMadeContact suppressed it and the cutaway appeared to
+        // lose its rim and depth shapes until the next insertion.
         ctx.save();
         ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
+        drawEntranceBridge();
+        drawEntranceRim();
+        ctx.restore();
+
+        }
+
+        // ==================== small connected folds ====================
+        // This is a LOCAL entrance detail, not a replacement body silhouette.
+        // The two outer contour roots share the same pelvis transform as the
+        // entrance rim. Only the inner edges bend with gap and response strength.
+        ctx.save();
+        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
+        const responseStrength = Math.max(0, s.response?.strength || 0);
+        const gapFrac = Math.max(0, Math.min(1,
+            (st0.gapT + st0.gapB - 1.4) / 5.0 + openingSpread * 0.22));
+        const reveal = Math.min(1, gapFrac * 0.72 + (s.inside ? 0.24 : 0));
+        const innerHalf = 0.42 + 0.80 * reveal - responseStrength * 0.20;
+        const centerX = E.x, centerY = E.y - 0.30;
+        const topY = centerY - 2.05;
+        const footY = centerY + 3.42;
+        // Slightly darker, pointed opening UNDER the small side folds.
+        // Its lower end tucks behind the unchanged rim/depth cover.
+        ctx.beginPath();
+        ctx.moveTo(centerX, topY + 0.37);
+        ctx.bezierCurveTo(centerX + innerHalf * 1.8, topY + 1.28,
+            centerX + innerHalf * 1.6, footY - 1.14, centerX, footY - 0.16);
+        ctx.bezierCurveTo(centerX - innerHalf * 1.6, footY - 1.14,
+            centerX - innerHalf * 1.8, topY + 1.28, centerX, topY + 0.37);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(145, 92, 108, ${0.15 + reveal * 0.11})`;
+        ctx.fill();
+
+        // Side occluders are UNDER the fold strokes, so neither fold outline
+        // can disappear behind a late skin-colored oval (v0.1.20 overlap).
+        drawRimSideOccluders();
+
+        // Draw right first, left second to preserve the established overlap.
         for (const sign of [1, -1]) {
-            const gap = sign === 1 ? st0.gapT : st0.gapB;
-            const nn = { x: n0.x * sign, y: n0.y * sign };
-            const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
-            const cx = E.x + nn.x * (gap + 0.7 - contraction) + out.x * 0.4;
-            const cy = E.y + nn.y * (gap + 0.7 - contraction) + out.y * 0.4;
+            const outside = sign === -1 ? -1 : 1;
+            const xOuter = centerX + outside * 2.50;
+            const xInner = centerX + outside * (innerHalf + 0.48);
+            const xFoot = centerX + outside * 1.43;
+            const subtleWave = responseStrength * 0.11;
             ctx.beginPath();
-            ctx.ellipse(cx, cy, 1.7, 3.1, sign * 0.22, 0, Math.PI * 2);
+            ctx.moveTo(xOuter - outside * 0.48, topY);
+            ctx.bezierCurveTo(xOuter + outside * 0.55, topY + 0.32,
+                xOuter + outside * 0.50, centerY + 0.63,
+                xFoot, footY);
+            ctx.bezierCurveTo(centerX + outside * (0.50 + innerHalf * 0.60),
+                footY - 0.75, xInner - outside * 0.20,
+                centerY - 0.42 - subtleWave,
+                xOuter - outside * 0.48, topY);
+            ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
+            // Open-ended contour: no top outline; roots blend into the skin.
+            ctx.beginPath();
+            ctx.moveTo(xOuter + outside * 0.01, topY + 0.46);
+            ctx.bezierCurveTo(xOuter + outside * 0.57,
+                centerY - 1.05, xOuter + outside * 0.38,
+                centerY + 0.93, xFoot, footY);
             ctx.strokeStyle = PAL.skinLine;
             ctx.lineWidth = 0.55;
             ctx.stroke();
+            // Deforming inner contour, smooth from a closed to wider shape.
+            ctx.beginPath();
+            ctx.moveTo(xOuter - outside * 0.48, topY + 0.45);
+            ctx.bezierCurveTo(centerX + outside * (innerHalf * 0.75),
+                centerY - 0.82, centerX + outside * innerHalf,
+                centerY + 1.04 + subtleWave, xFoot, footY - 0.17);
+            ctx.strokeStyle = PAL.skinLine;
+            ctx.lineWidth = 0.57;
+            ctx.stroke();
         }
         ctx.restore();
-
-        ctx.save();
-        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-        drawRimSideOccluders();
-        ctx.restore();
-
-        // Gentle rhythmic highlight on the outer folds. Its intensity follows
-        // the same physical wave as the temporary tightening; no independent
-        // oscillator can drift out of phase.
-        const responseStrength = Math.max(0, s.response?.strength || 0);
-        if (responseStrength > 0.05) {
-            ctx.save();
-            ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-            for (const m of [-1, 1]) {
-                const nn = {x: n0.x * m, y: n0.y * m};
-                const gap = m === 1 ? st0.gapT : st0.gapB;
-                const c = { x: E.x + nn.x * (gap + 1.55 - responseStrength * 0.9) + out.x * 0.4,
-                            y: E.y + nn.y * (gap + 1.55 - responseStrength * 0.9) + out.y * 0.4 };
-                ctx.beginPath();
-                ctx.ellipse(c.x, c.y, 0.34, 1.30, m * 0.22, -0.9, 0.9);
-                ctx.strokeStyle = `rgba(255,235,240,${0.14 + responseStrength * 0.27})`;
-                ctx.lineWidth = 0.27;
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
 
         // Intentionally NO separate external tear overlay: the true tip tear
         // is already rendered in the shaft layer and occluded by the normal
