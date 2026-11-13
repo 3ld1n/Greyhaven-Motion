@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.16 — Protection Failure Visual Parity
+# Greyhaven Motion v0.1.17 — Protection Failure Visual Parity
 
 Built directly on the working v0.1.15 package. All original controls, event percentages, ranges, prompt replay, and scene-level event tracking remain available.
 

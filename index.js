@@ -406,6 +406,7 @@ function captureScene(fromSim) {
       vagCount: st.cum.vagCount, wombCount: st.cum.wombCount,
       condom: st.cum.condom, condomCount: st.cum.condomCount,
       preFluid: st.cum.preFluid ? {...st.cum.preFluid} : null,
+      releaseQueue: st.cum.releaseQueue ? {...st.cum.releaseQueue} : null,
     },
     pierce: st.pierce,
     wombBroken: st.wombBroken,
@@ -427,6 +428,7 @@ function restoreScene(toSim, snap) {
   Object.assign(st.cum, snap.cum);
   // Rebuild copies should not share a live effect object with an older sim.
   if (snap.cum.preFluid) st.cum.preFluid = {...snap.cum.preFluid};
+  st.cum.releaseQueue = snap.cum.releaseQueue ? {...snap.cum.releaseQueue} : null;
   st.cum.particles = (snap.cum.particles || []).map(p => ({...p}));
   st.wombBroken = !!snap.wombBroken;
   toSim.setPierce(snap.pierce);

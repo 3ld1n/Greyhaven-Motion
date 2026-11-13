@@ -118,6 +118,61 @@ export function createMissionaryRenderer(canvas) {
         ctx.closePath();
     }
 
+    function tearAgeSeconds(now) {
+        return tearStartedAt === null ? 10 : (now - tearStartedAt) / 1000;
+    }
+
+    function drawProtectionTear(anchor, axis, now, opts = {}) {
+        const { exterior = false } = opts;
+        const norm = Math.hypot(axis.x, axis.y) || 1;
+        const tx = axis.x / norm, ty = axis.y / norm;
+        const nx = -ty, ny = tx;
+        const age = tearAgeSeconds(now);
+        const burst = Math.max(0, Math.exp(-Math.max(0, age) * 7.5));
+        const wiggle = burst * Math.sin(age * 46);
+        const baseSpread = exterior ? 0.56 : 0.50;
+        const openSpread = baseSpread + burst * 0.22;
+        const mouthLift = exterior ? 0.04 : -0.05;
+        const tearDepth = (exterior ? 0.70 : 0.86) + burst * 0.18;
+        const flapDrift = 0.50 + burst * 0.20;
+        const flapKick = 0.18 + burst * 0.16 + wiggle * 0.05;
+        const c = { x: anchor.x - tx * mouthLift, y: anchor.y - ty * mouthLift };
+        const leftTop = { x: c.x + nx * openSpread - tx * 0.10, y: c.y + ny * openSpread - ty * 0.10 };
+        const rightTop = { x: c.x - nx * openSpread - tx * 0.10, y: c.y - ny * openSpread - ty * 0.10 };
+        const valley = { x: c.x + tx * tearDepth, y: c.y + ty * tearDepth };
+        const leftFlap = { x: leftTop.x + nx * flapKick + tx * flapDrift, y: leftTop.y + ny * flapKick + ty * flapDrift };
+        const rightFlap = { x: rightTop.x - nx * flapKick + tx * flapDrift, y: rightTop.y - ny * flapKick + ty * flapDrift };
+        const slitLeft = { x: c.x + nx * (openSpread * 0.52), y: c.y + ny * (openSpread * 0.52) };
+        const slitRight = { x: c.x - nx * (openSpread * 0.52), y: c.y - ny * (openSpread * 0.52) };
+        const slitValley = { x: c.x + tx * (tearDepth * 0.72), y: c.y + ty * (tearDepth * 0.72) };
+
+        // Small open mouth in the protection, so it reads as an actual tear.
+        ctx.beginPath();
+        ctx.moveTo(slitLeft.x, slitLeft.y);
+        ctx.lineTo(slitValley.x, slitValley.y);
+        ctx.lineTo(slitRight.x, slitRight.y);
+        ctx.closePath();
+        ctx.fillStyle = exterior ? 'rgba(188, 152, 138, 0.92)' : 'rgba(206, 158, 144, 0.88)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(leftTop.x, leftTop.y);
+        ctx.lineTo(valley.x, valley.y);
+        ctx.lineTo(rightTop.x, rightTop.y);
+        ctx.strokeStyle = 'rgba(26, 94, 152, 0.96)';
+        ctx.lineWidth = exterior ? 0.56 : 0.60;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(leftTop.x, leftTop.y);
+        ctx.lineTo(leftFlap.x, leftFlap.y);
+        ctx.moveTo(rightTop.x, rightTop.y);
+        ctx.lineTo(rightFlap.x, rightFlap.y);
+        ctx.strokeStyle = 'rgba(105, 186, 248, 0.92)';
+        ctx.lineWidth = exterior ? 0.58 : 0.64;
+        ctx.stroke();
+    }
+
     function render(sim) {
         const s = sim.state;
         if (!canvas.width) return;
@@ -697,34 +752,8 @@ export function createMissionaryRenderer(canvas) {
                     }
                 }
                 if (protectionBroken && spine.length > 4) {
-                    // Permanent V-shaped rupture in the protective layer near
-                    // the tip, with a short decaying flap movement on failure.
-                    const age = tearStartedAt === null ? 10 : (now - tearStartedAt) / 1000;
-                    const wobble = Math.max(0, Math.exp(-Math.max(0, age) * 4)) * Math.sin(age * 32);
                     const axis = { x: spine[3].pos.x - spine[0].pos.x, y: spine[3].pos.y - spine[0].pos.y };
-                    const norm = Math.hypot(axis.x, axis.y) || 1;
-                    const tx = axis.x / norm, ty = axis.y / norm;
-                    const nx = -ty, ny = tx;
-                    const a = spine[2].pos;
-                    const flap = 1 + 0.35 * wobble;
-                    const left = {x:a.x + nx * (1.25 + 0.25 * wobble), y:a.y + ny * (1.25 + 0.25 * wobble)};
-                    const right = {x:a.x - nx * (1.25 + 0.25 * wobble), y:a.y - ny * (1.25 + 0.25 * wobble)};
-                    const notch = {x:a.x - tx * (1.15 + 0.4 * wobble), y:a.y - ty * (1.15 + 0.4 * wobble)};
-                    ctx.beginPath();
-                    ctx.moveTo(left.x,left.y);
-                    ctx.lineTo(notch.x,notch.y);
-                    ctx.lineTo(right.x,right.y);
-                    ctx.strokeStyle = 'rgba(28, 89, 142, 0.95)';
-                    ctx.lineWidth = 0.65;
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(left.x,left.y);
-                    ctx.lineTo(left.x + tx * flap + nx * 0.35,left.y + ty * flap + ny * 0.35);
-                    ctx.moveTo(right.x,right.y);
-                    ctx.lineTo(right.x + tx * flap - nx * 0.35,right.y + ty * flap - ny * 0.35);
-                    ctx.strokeStyle = 'rgba(105, 186, 248, 0.88)';
-                    ctx.lineWidth = 0.7;
-                    ctx.stroke();
+                    drawProtectionTear(spine[2].pos, axis, now);
                 }
             }
         }
@@ -852,20 +881,30 @@ export function createMissionaryRenderer(canvas) {
         }
 
         // The isolated tiny pre-fluid effect never triggers the large release
-        // visual. When the depth event changes, its bright dot travels deeper.
+        // visual. Below the threshold it stays only in the canal. Once the
+        // threshold is crossed, the travelling dot goes deeper first; the tiny
+        // settled dot inside the womb appears only after the travel completes.
         if (s.cum.preFluid?.active) {
             const pf = s.cum.preFluid;
             const glow = 0.48 + 0.20 * Math.min(1, pf.animation || 0);
-            const p = pf.deep ? W : s.spinePoint(Math.max(0.5, Math.min(L - 1, s.d * 0.55)));
-            ctx.beginPath();
-            ctx.ellipse(p.x + 0.5, p.y + 0.7, 0.43, 0.74, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(252,250,255,${glow})`;
-            ctx.fill();
-            if (pf.deep && pf.animation > 0) {
+            if (!pf.deep) {
+                const p = s.spinePoint(Math.max(0.5, Math.min(L - 1, (pf.atDepth || s.d) * 0.55)));
+                ctx.beginPath();
+                ctx.ellipse(p.x + 0.5, p.y + 0.7, 0.43, 0.74, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(252,250,255,${glow})`;
+                ctx.fill();
+            } else if (pf.animation > 0) {
                 const travel = Math.max(0, Math.min(1, 1 - pf.animation / 1.5));
-                const q = s.spinePoint(L * (0.6 + 0.4 * travel));
-                ctx.beginPath(); ctx.arc(q.x, q.y, 0.25, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(252,250,255,0.75)'; ctx.fill();
+                const q = s.spinePoint(L * (0.62 + 0.38 * travel));
+                ctx.beginPath();
+                ctx.arc(q.x, q.y, 0.25, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(252,250,255,0.78)';
+                ctx.fill();
+            } else {
+                ctx.beginPath();
+                ctx.ellipse(W.x + 0.10, W.y + 1.55, 0.38, 0.62, 0.12, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(252,250,255,0.68)';
+                ctx.fill();
             }
         }
 
@@ -898,29 +937,15 @@ export function createMissionaryRenderer(canvas) {
         }
         ctx.restore();
 
-        // In the external (non-X-ray) view an internal tip tear can be hidden
-        // behind the skin cover. Indicate the same failure at the visible
-        // exposed edge, without drawing extra full-release fluid effects.
-        if (!showXray && protectionBroken && s.inside) {
-            const age = tearStartedAt === null ? 10 : (now - tearStartedAt) / 1000;
-            const bounce = Math.exp(-Math.max(0, age) * 4) * Math.sin(age * 32) * 0.35;
-            const x = E.x + pelvisSway * 0.8, y = E.y + 4.2 + pelvisBounce * 0.85;
-            ctx.beginPath();
-            ctx.moveTo(x - 1.15 - bounce, y - 0.6);
-            ctx.lineTo(x, y + 0.9 + bounce);
-            ctx.lineTo(x + 1.15 + bounce, y - 0.6);
-            ctx.strokeStyle = 'rgba(28, 89, 142, 0.95)';
-            ctx.lineWidth = 0.7;
-            ctx.stroke();
-        }
-
-        // Extremely small surface bead while the pre-fluid is still local;
-        // this is intentionally independent of the large leaking pathway.
-        if (s.cum.preFluid?.active && !s.cum.preFluid.deep && !sealed) {
-            ctx.beginPath();
-            ctx.ellipse(E.x + 0.85, E.y + 1.7, 0.36, 0.65, 0.12, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(252,250,255,${0.36 + Math.min(0.28, s.cum.preFluid.animation * 0.13)})`;
-            ctx.fill();
+        // In the external (non-X-ray) view the break marker must stay attached
+        // to the moving protection on the exposed shaft rather than floating
+        // as an entrance overlay.
+        if (!showXray && protectionBroken && spine.length > 4) {
+            const visibleIndex = Math.max(2, spine.findIndex(pt => pt.pos.y >= edgeY + 0.85));
+            const tearIndex = visibleIndex > 1 ? Math.min(spine.length - 3, visibleIndex) : Math.min(spine.length - 3, 3);
+            const anchor = spine[tearIndex].pos;
+            const tail = spine[Math.min(spine.length - 1, tearIndex + 2)].pos;
+            drawProtectionTear(anchor, { x: tail.x - anchor.x, y: tail.y - anchor.y }, now, { exterior: true });
         }
 
         // Thin blood trickle at the lips after a hymen break
