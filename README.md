@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.26 — Fold Morph Enlargement Refinement
+# Greyhaven Motion v0.1.27 — Local Fold Rebuild
 
 ## Repairs in this release
 - **Preserved approved thigh illustration:** the entire existing thigh outline path from v0.1.22 is unchanged, including the off-screen lower continuation. No new giver body art was introduced.
@@ -18,12 +18,13 @@
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **v0.1.26 fold refinement:** enlarges the sketch-based fold system so it matches the intended visual scale much better.
-- **Shape morph instead of scale bounce:** the folds now change geometry toward the open sketch state instead of behaving like a bouncing resized icon.
-- **Closed-state hidden rim:** the visible non-xray rim is now hidden when the folds are closed and only appears as the opening state increases.
-- **Redesigned visible rim:** the visible lip is now drawn directly by the fold block as a curved pointed rim under the folds.
-- **Longer center line:** the central line/Y feature is extended to better match the reference drawing.
-- **Preserved baseline:** thighs/body, off-screen thigh extension, x-ray support, response logic, auto mode, and event logic remain intact.
+- **v0.1.27 fold-area rebuild:** replaces the previous fold attempt with a local body-attached reconstruction.
+- **Three explicit states:** closed/untouched, active inserted/opening, and wider spread/open states based on the user sketches.
+- **No icon-like scale bounce:** the fold geometry morphs locally instead of scaling one combined illustration.
+- **Hidden rim when closed:** the redesigned rim only appears during active/open states.
+- **Local skin seam mask:** covers older seam/outline remnants near the fold roots so duplicate thigh-line artifacts do not leak through.
+- **State-dependent Y detail:** the center Y-line is visible only in the closed state and fades during insertion/opening.
+- **Under-rim connector preserved:** the white triangle below the folds stays narrowed without altering the approved thighs/body baseline.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.
