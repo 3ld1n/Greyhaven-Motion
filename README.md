@@ -18,12 +18,12 @@
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **Visual recovery from v0.1.21:** the taker body/thigh illustration has been restored to the stable **v0.1.20** visual base. The failed fold redesign and the experimental giver lower-body extension have both been removed.
-- **Off-screen lower continuation only:** the lower thigh continuation is now pushed farther below the frame so motion should no longer reveal a hard cut at the render-box edge. The visible thigh/body silhouette is otherwise unchanged.
-- **Squirt summary clarification:** squirt events now read as an intense orgasm with a squirting response, **spraying fluids outward**, which should help the chat distinguish them from a regular finish.
-- **Squirt also counts as orgasm:** pressing **Squirt** increments both the squirt counter and the orgasm counter while still logging a distinct squirt event.
-- **Response-wave thigh motion retained:** the existing thigh motion system now also reacts to orgasm/squirt contractions, without changing the base drawing style.
-- **Preserved v0.1.20 features:** auto motion controls, rim/X-ray bridge treatment, wetness buildup, contraction resistance, and the 60/120 Hz physics selector are all retained.
+- **Fold-only patch:** this release keeps the approved v0.1.23 body/thigh baseline and only adjusts the fold area.
+- **Removes leftover oval fold artifacts:** the visible fold stack no longer uses the old skin-colored oval occluders, which were still reading as duplicate fold shapes underneath.
+- **Keeps the darker center opening:** the darker central opening remains the main reactive feature. Its upper part stays above the rim/shaft area, while the darker lower underlay remains beneath the shaft.
+- **Side folds refined:** the side folds are now smaller, subtler, and partially contoured so they no longer read as static upside-down outlined ovals. Their inner contours react smoothly with opening and contraction.
+- **Local thigh connection hints:** added only small local contour hints near the fold roots so the folds feel attached to the surrounding skin without drawing a full separation line up the thighs.
+- **Everything else preserved:** thighs, off-screen extension, X-ray entrance, response waves, wetness, auto motion, and event logic remain unchanged.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.

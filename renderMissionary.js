@@ -699,9 +699,15 @@ export function createMissionaryRenderer(canvas) {
             const openY = E.y + 2.02;
             const shownOpen = hasMadeContact ? Math.max(contactOpen, 0.18) : 0;
             if (shownOpen > 0.06) {
+                const lowW = Math.max(1.10, openW * 0.86);
+                const lowH = Math.max(0.78, openH * 0.96);
                 ctx.beginPath();
-                ctx.ellipse(E.x, openY + 0.08, Math.max(0.96, openW * 0.82), Math.max(0.66, openH * 0.88), 0, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(78, 36, 48, ${0.22 + shownOpen * 0.30})`;
+                ctx.moveTo(E.x - lowW, openY - 0.02);
+                ctx.quadraticCurveTo(E.x, openY - lowH * 0.55, E.x + lowW, openY - 0.02);
+                ctx.quadraticCurveTo(E.x + lowW * 0.78, openY + lowH * 0.78, E.x, openY + lowH * 0.96);
+                ctx.quadraticCurveTo(E.x - lowW * 0.78, openY + lowH * 0.78, E.x - lowW, openY - 0.02);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(98, 48, 62, ${0.42 + shownOpen * 0.30})`;
                 ctx.fill();
             }
             ctx.restore();
@@ -1008,71 +1014,85 @@ export function createMissionaryRenderer(canvas) {
         }
 
         // ==================== small connected folds ====================
-        // This is a LOCAL entrance detail, not a replacement body silhouette.
-        // The two outer contour roots share the same pelvis transform as the
-        // entrance rim. Only the inner edges bend with gap and response strength.
+        // Fold-only patch: keep the center darker opening as the main feature,
+        // remove the leftover oval feel, and let the side folds react smoothly.
         ctx.save();
         ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
         const responseStrength = Math.max(0, s.response?.strength || 0);
         const gapFrac = Math.max(0, Math.min(1,
             (st0.gapT + st0.gapB - 1.4) / 5.0 + openingSpread * 0.22));
-        const reveal = Math.min(1, gapFrac * 0.72 + (s.inside ? 0.24 : 0));
-        const innerHalf = 0.42 + 0.80 * reveal - responseStrength * 0.20;
-        const centerX = E.x, centerY = E.y - 0.30;
-        const topY = centerY - 2.05;
-        const footY = centerY + 3.42;
-        // Slightly darker, pointed opening UNDER the small side folds.
-        // Its lower end tucks behind the unchanged rim/depth cover.
+        const reveal = Math.min(1, gapFrac * 0.78 + (s.inside ? 0.26 : 0));
+        const pulse = responseStrength * (s.response?.hold ? 1 : 0.72 + 0.28 * Math.sin((s.response?.elapsed || 0) * 15.5));
+        const centerX = E.x, centerY = E.y - 0.28;
+        const topY = centerY - 1.90;
+        const footY = centerY + 3.18;
+        const rimY = edgeY - edgeH + 0.24;
+        const innerHalf = 0.40 + 0.92 * reveal - pulse * 0.24;
+
+        // Upper darker opening ABOVE the shaft/rim. Keep this visible and reactive.
         ctx.beginPath();
-        ctx.moveTo(centerX, topY + 0.37);
-        ctx.bezierCurveTo(centerX + innerHalf * 1.8, topY + 1.28,
-            centerX + innerHalf * 1.6, footY - 1.14, centerX, footY - 0.16);
-        ctx.bezierCurveTo(centerX - innerHalf * 1.6, footY - 1.14,
-            centerX - innerHalf * 1.8, topY + 1.28, centerX, topY + 0.37);
+        ctx.moveTo(centerX, topY + 0.34);
+        ctx.bezierCurveTo(centerX + innerHalf * 1.52, topY + 1.10,
+            centerX + innerHalf * 1.34, rimY - 0.28, centerX, rimY + 0.02);
+        ctx.bezierCurveTo(centerX - innerHalf * 1.34, rimY - 0.28,
+            centerX - innerHalf * 1.52, topY + 1.10, centerX, topY + 0.34);
         ctx.closePath();
-        ctx.fillStyle = `rgba(145, 92, 108, ${0.15 + reveal * 0.11})`;
+        ctx.fillStyle = `rgba(126, 78, 94, ${0.54 + reveal * 0.16})`;
         ctx.fill();
 
-        // Side occluders are UNDER the fold strokes, so neither fold outline
-        // can disappear behind a late skin-colored oval (v0.1.20 overlap).
-        drawRimSideOccluders();
-
-        // Draw right first, left second to preserve the established overlap.
-        for (const sign of [1, -1]) {
-            const outside = sign === -1 ? -1 : 1;
-            const xOuter = centerX + outside * 2.50;
-            const xInner = centerX + outside * (innerHalf + 0.48);
-            const xFoot = centerX + outside * 1.43;
-            const subtleWave = responseStrength * 0.11;
+        // Small connection hints near the fold roots so the fold system reads as
+        // attached to the surrounding skin without drawing a full body-separation line.
+        for (const sign of [-1, 1]) {
             ctx.beginPath();
-            ctx.moveTo(xOuter - outside * 0.48, topY);
-            ctx.bezierCurveTo(xOuter + outside * 0.55, topY + 0.32,
-                xOuter + outside * 0.50, centerY + 0.63,
+            ctx.moveTo(centerX + sign * 2.05, topY - 0.08);
+            ctx.quadraticCurveTo(centerX + sign * 2.42, topY - 0.38, centerX + sign * 2.66, topY - 0.06);
+            ctx.strokeStyle = 'rgba(176, 124, 114, 0.95)';
+            ctx.lineWidth = 0.55;
+            ctx.stroke();
+        }
+
+        // Small side folds: filled softly, but only partially outlined so they no
+        // longer read as upside-down outlined ovals. Their inner edges react to the
+        // gap and response pulse.
+        for (const sign of [1, -1]) {
+            const xOuter = centerX + sign * (1.92 + reveal * 0.12 - pulse * 0.08);
+            const xShoulder = centerX + sign * (2.18 + reveal * 0.12);
+            const xInner = centerX + sign * (0.62 + innerHalf * 0.68 - pulse * 0.16);
+            const xFoot = centerX + sign * (1.02 + innerHalf * 0.22);
+            const shoulderY = topY + 0.12;
+            const subtleWave = pulse * 0.14;
+
+            ctx.beginPath();
+            ctx.moveTo(xOuter, shoulderY);
+            ctx.bezierCurveTo(xShoulder + sign * 0.36, centerY - 0.26,
+                xShoulder + sign * 0.12, centerY + 0.78,
                 xFoot, footY);
-            ctx.bezierCurveTo(centerX + outside * (0.50 + innerHalf * 0.60),
-                footY - 0.75, xInner - outside * 0.20,
-                centerY - 0.42 - subtleWave,
-                xOuter - outside * 0.48, topY);
+            ctx.bezierCurveTo(centerX + sign * (0.36 + innerHalf * 0.52),
+                footY - 0.66, xInner,
+                centerY - 0.22 - subtleWave,
+                xOuter, shoulderY);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
-            // Open-ended contour: no top outline; roots blend into the skin.
+
+            // Outer connection contour only: stop before it wraps into a full oval.
             ctx.beginPath();
-            ctx.moveTo(xOuter + outside * 0.01, topY + 0.46);
-            ctx.bezierCurveTo(xOuter + outside * 0.57,
-                centerY - 1.05, xOuter + outside * 0.38,
-                centerY + 0.93, xFoot, footY);
+            ctx.moveTo(xOuter + sign * 0.06, shoulderY + 0.30);
+            ctx.bezierCurveTo(xShoulder + sign * 0.22,
+                centerY - 0.42, xShoulder + sign * 0.04,
+                centerY + 0.72, xFoot, footY - 0.02);
             ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.55;
+            ctx.lineWidth = 0.56;
             ctx.stroke();
-            // Deforming inner contour, smooth from a closed to wider shape.
+
+            // Inner active contour: this is the main reacting fold line.
             ctx.beginPath();
-            ctx.moveTo(xOuter - outside * 0.48, topY + 0.45);
-            ctx.bezierCurveTo(centerX + outside * (innerHalf * 0.75),
-                centerY - 0.82, centerX + outside * innerHalf,
-                centerY + 1.04 + subtleWave, xFoot, footY - 0.17);
+            ctx.moveTo(xOuter + sign * 0.02, shoulderY + 0.44);
+            ctx.bezierCurveTo(centerX + sign * (innerHalf * 0.52),
+                centerY - 0.62, centerX + sign * innerHalf,
+                centerY + 0.86 + subtleWave, xFoot, footY - 0.12);
             ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.57;
+            ctx.lineWidth = 0.60;
             ctx.stroke();
         }
         ctx.restore();
