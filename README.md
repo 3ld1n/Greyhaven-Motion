@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.25 — Sketch-Based Fold Redesign
+# Greyhaven Motion v0.1.26 — Fold Morph Enlargement Refinement
 
 ## Repairs in this release
 - **Preserved approved thigh illustration:** the entire existing thigh outline path from v0.1.22 is unchanged, including the off-screen lower continuation. No new giver body art was introduced.
@@ -18,13 +18,12 @@
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **Sketch-based fold redesign:** rebuilt the fold/entrance visuals from scratch based on the user's closed/open reference sketches.
-- **New fold system:** replaces the old oval/petal-style fold shapes with two slender reactive fold contours that open and contract smoothly.
-- **Lighter central opening:** the center opening above the rim is now lighter again and connected directly to the rim, matching the preferred earlier look.
-- **Under-shaft connector:** narrows the visible white triangle below the folds without changing the approved thigh outlines; this part stays beneath the shaft.
-- **Smaller / cleaner entrance geometry:** the bridge/rim area was redrawn to better support a pointier central cap and smoother connection to the fold system.
-- **State memory preserved:** after use, the fold system still keeps a partial openness memory rather than snapping back to the fully closed starting state.
-- **Everything else preserved:** thighs/body baseline, off-screen extension, X-ray support, response waves, auto motion, and event logic remain intact.
+- **v0.1.26 fold refinement:** enlarges the sketch-based fold system so it matches the intended visual scale much better.
+- **Shape morph instead of scale bounce:** the folds now change geometry toward the open sketch state instead of behaving like a bouncing resized icon.
+- **Closed-state hidden rim:** the visible non-xray rim is now hidden when the folds are closed and only appears as the opening state increases.
+- **Redesigned visible rim:** the visible lip is now drawn directly by the fold block as a curved pointed rim under the folds.
+- **Longer center line:** the central line/Y feature is extended to better match the reference drawing.
+- **Preserved baseline:** thighs/body, off-screen thigh extension, x-ray support, response logic, auto mode, and event logic remain intact.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.
