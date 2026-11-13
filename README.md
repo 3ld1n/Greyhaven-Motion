@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.23 — Fold Refinement, X-ray Cover & Visible Response Waves
+# Greyhaven Motion v0.1.25 — Sketch-Based Fold Redesign
 
 ## Repairs in this release
 - **Preserved approved thigh illustration:** the entire existing thigh outline path from v0.1.22 is unchanged, including the off-screen lower continuation. No new giver body art was introduced.
@@ -18,12 +18,13 @@
 # Greyhaven Motion v0.1.22 — Visual Recovery Repair
 
 ## What's new
-- **Fold-only patch:** this release keeps the approved v0.1.23 body/thigh baseline and only adjusts the fold area.
-- **Removes leftover oval fold artifacts:** the visible fold stack no longer uses the old skin-colored oval occluders, which were still reading as duplicate fold shapes underneath.
-- **Keeps the darker center opening:** the darker central opening remains the main reactive feature. Its upper part stays above the rim/shaft area, while the darker lower underlay remains beneath the shaft.
-- **Side folds refined:** the side folds are now smaller, subtler, and partially contoured so they no longer read as static upside-down outlined ovals. Their inner contours react smoothly with opening and contraction.
-- **Local thigh connection hints:** added only small local contour hints near the fold roots so the folds feel attached to the surrounding skin without drawing a full separation line up the thighs.
-- **Everything else preserved:** thighs, off-screen extension, X-ray entrance, response waves, wetness, auto motion, and event logic remain unchanged.
+- **Sketch-based fold redesign:** rebuilt the fold/entrance visuals from scratch based on the user's closed/open reference sketches.
+- **New fold system:** replaces the old oval/petal-style fold shapes with two slender reactive fold contours that open and contract smoothly.
+- **Lighter central opening:** the center opening above the rim is now lighter again and connected directly to the rim, matching the preferred earlier look.
+- **Under-shaft connector:** narrows the visible white triangle below the folds without changing the approved thigh outlines; this part stays beneath the shaft.
+- **Smaller / cleaner entrance geometry:** the bridge/rim area was redrawn to better support a pointier central cap and smoother connection to the fold system.
+- **State memory preserved:** after use, the fold system still keeps a partial openness memory rather than snapping back to the fully closed starting state.
+- **Everything else preserved:** thighs/body baseline, off-screen extension, X-ray support, response waves, auto motion, and event logic remain intact.
 
 ## Notes and testing
 - `node tests/v020-auto-residue.mjs` checks the new persistent squirt residue, auto-motion wiring and the updated renderer hooks.

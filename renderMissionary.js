@@ -297,25 +297,28 @@ export function createMissionaryRenderer(canvas) {
             for (let i = start + 1; i <= end; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
         }
         function drawEntranceBridge() {
-            const bridgeTopY = edgeY - edgeH - 0.98;
-            const bridgeBottomY = edgeY - edgeH + 0.10;
-            const bridgeOuterY = edgeY - 0.08;
+            const bridgeTipY = edgeY - edgeH - 0.92;
+            const bridgeLipY = edgeY - edgeH + 0.08;
+            const bridgeOuterY = edgeY - 0.04;
+            const shoulder = edgeW * 0.92;
+            const lipInset = edgeW * 0.44;
             ctx.beginPath();
-            ctx.moveTo(E.x - edgeW - 0.28, bridgeOuterY);
-            ctx.quadraticCurveTo(E.x - edgeW * 0.82, bridgeTopY + 0.16, E.x, bridgeTopY - 0.16);
-            ctx.quadraticCurveTo(E.x + edgeW * 0.82, bridgeTopY + 0.16, E.x + edgeW + 0.28, bridgeOuterY);
-            ctx.lineTo(E.x + edgeW * 0.70, bridgeBottomY);
-            ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.10, E.x - edgeW * 0.70, bridgeBottomY);
+            ctx.moveTo(E.x - shoulder - 0.12, bridgeOuterY);
+            ctx.quadraticCurveTo(E.x - edgeW * 0.86, bridgeTipY + 0.22, E.x, bridgeTipY - 0.06);
+            ctx.quadraticCurveTo(E.x + edgeW * 0.86, bridgeTipY + 0.22, E.x + shoulder + 0.12, bridgeOuterY);
+            ctx.lineTo(E.x + lipInset, bridgeLipY + 0.08);
+            ctx.quadraticCurveTo(E.x, bridgeLipY - 0.08, E.x - lipInset, bridgeLipY + 0.08);
             ctx.closePath();
             ctx.fillStyle = PAL.skin;
             ctx.fill();
+            // Lighter central opening cap: connected to the rim and intentionally not too dark.
             ctx.beginPath();
-            ctx.moveTo(E.x - edgeW * 0.64, edgeY - edgeH + 0.08);
-            ctx.quadraticCurveTo(E.x, edgeY - edgeH - 0.18, E.x + edgeW * 0.64, edgeY - edgeH + 0.08);
-            ctx.lineTo(E.x + edgeW * 0.46, edgeY - edgeH + 0.62);
-            ctx.quadraticCurveTo(E.x, edgeY - edgeH + 0.42, E.x - edgeW * 0.46, edgeY - edgeH + 0.62);
+            ctx.moveTo(E.x, bridgeTipY + 0.26);
+            ctx.quadraticCurveTo(E.x + edgeW * 0.30, bridgeTipY + 0.72, E.x + lipInset * 0.84, bridgeLipY + 0.08);
+            ctx.quadraticCurveTo(E.x, bridgeLipY - 0.02, E.x - lipInset * 0.84, bridgeLipY + 0.08);
+            ctx.quadraticCurveTo(E.x - edgeW * 0.30, bridgeTipY + 0.72, E.x, bridgeTipY + 0.26);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(145, 92, 108, 0.18)';
+            ctx.fillStyle = 'rgba(170, 128, 138, 0.22)';
             ctx.fill();
         }
         function drawEntranceRim() {
@@ -692,24 +695,20 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
             ctx.fill();
 
-            // Opening underlay: hidden before first contact, then it stays visible.
-            // Keep only the darker depth shape so no pale/tan line appears under the rim.
-            const openW = 2.10 + openingSpread * 2.05;
-            const openH = 0.92 + openingSpread * 0.96;
-            const openY = E.y + 2.02;
-            const shownOpen = hasMadeContact ? Math.max(contactOpen, 0.18) : 0;
-            if (shownOpen > 0.06) {
-                const lowW = Math.max(1.10, openW * 0.86);
-                const lowH = Math.max(0.78, openH * 0.96);
-                ctx.beginPath();
-                ctx.moveTo(E.x - lowW, openY - 0.02);
-                ctx.quadraticCurveTo(E.x, openY - lowH * 0.55, E.x + lowW, openY - 0.02);
-                ctx.quadraticCurveTo(E.x + lowW * 0.78, openY + lowH * 0.78, E.x, openY + lowH * 0.96);
-                ctx.quadraticCurveTo(E.x - lowW * 0.78, openY + lowH * 0.78, E.x - lowW, openY - 0.02);
-                ctx.closePath();
-                ctx.fillStyle = `rgba(98, 48, 62, ${0.42 + shownOpen * 0.30})`;
-                ctx.fill();
-            }
+            // Small under-shaft connector: narrows the visible white triangle without
+            // changing the approved thigh outlines. This lives UNDER the shaft.
+            const shownOpen = hasMadeContact ? Math.max(contactOpen, 0.16) : 0.06;
+            const connHalf = Math.max(0.82, 1.16 - shownOpen * 0.18);
+            const connTopY = edgeY - edgeH + 0.12;
+            const connBotY = E.y + 2.78 - shownOpen * 0.18;
+            ctx.beginPath();
+            ctx.moveTo(E.x - connHalf, connTopY);
+            ctx.quadraticCurveTo(E.x, connTopY + 0.16, E.x + connHalf, connTopY);
+            ctx.quadraticCurveTo(E.x + connHalf * 0.64, connBotY - 0.26, E.x, connBotY);
+            ctx.quadraticCurveTo(E.x - connHalf * 0.64, connBotY - 0.26, E.x - connHalf, connTopY);
+            ctx.closePath();
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
             ctx.restore();
         }
         ctx.restore(); // end body/jiggle layer
@@ -1013,86 +1012,98 @@ export function createMissionaryRenderer(canvas) {
 
         }
 
-        // ==================== small connected folds ====================
-        // Fold-only patch: keep the center darker opening as the main feature,
-        // remove the leftover oval feel, and let the side folds react smoothly.
+        // ==================== redesigned folds / entrance system ====================
+        // Rebuilt from scratch to match the user's closed/open sketches:
+        // slender reactive folds, a light center opening connected to the rim,
+        // no oval fold objects, and preserved partial openness after use.
         ctx.save();
         ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
         const responseStrength = Math.max(0, s.response?.strength || 0);
         const gapFrac = Math.max(0, Math.min(1,
             (st0.gapT + st0.gapB - 1.4) / 5.0 + openingSpread * 0.22));
-        const reveal = Math.min(1, gapFrac * 0.78 + (s.inside ? 0.26 : 0));
-        const pulse = responseStrength * (s.response?.hold ? 1 : 0.72 + 0.28 * Math.sin((s.response?.elapsed || 0) * 15.5));
-        const centerX = E.x, centerY = E.y - 0.28;
-        const topY = centerY - 1.90;
-        const footY = centerY + 3.18;
-        const rimY = edgeY - edgeH + 0.24;
-        const innerHalf = 0.40 + 0.92 * reveal - pulse * 0.24;
+        const retainedOpen = hasMadeContact ? Math.max(0.10, gapFrac * 0.86 + (s.inside ? 0.12 : 0)) : 0;
+        const pulse = responseStrength * (s.response?.hold ? 1 : 0.74 + 0.26 * Math.sin((s.response?.elapsed || 0) * 15.5));
+        const foldOpen = Math.min(1.12, Math.max(0, retainedOpen + pulse * 0.15 + motionContact * 0.08));
+        const centerX = E.x;
+        const rootY = edgeY - edgeH + 0.10;
+        const rootHalf = 0.92 + foldOpen * 0.20;
+        const upperTipY = rootY - (1.18 + foldOpen * 1.22 + pulse * 0.12);
+        const upperSideX = 0.72 + foldOpen * 0.46;
+        const foldTipY = rootY - (2.95 + foldOpen * 1.05);
+        const foldSpread = 2.66 + foldOpen * 1.42;
+        const lineLean = 0.12 + foldOpen * 0.12;
 
-        // Upper darker opening ABOVE the shaft/rim. Keep this visible and reactive.
+        // Light central opening ABOVE the shaft/rim, connected directly to the rim.
         ctx.beginPath();
-        ctx.moveTo(centerX, topY + 0.34);
-        ctx.bezierCurveTo(centerX + innerHalf * 1.52, topY + 1.10,
-            centerX + innerHalf * 1.34, rimY - 0.28, centerX, rimY + 0.02);
-        ctx.bezierCurveTo(centerX - innerHalf * 1.34, rimY - 0.28,
-            centerX - innerHalf * 1.52, topY + 1.10, centerX, topY + 0.34);
+        ctx.moveTo(centerX, upperTipY);
+        ctx.quadraticCurveTo(centerX + upperSideX * 0.70, upperTipY + 0.64,
+            centerX + rootHalf * 0.92, rootY + 0.03);
+        ctx.quadraticCurveTo(centerX, rootY - 0.10,
+            centerX - rootHalf * 0.92, rootY + 0.03);
+        ctx.quadraticCurveTo(centerX - upperSideX * 0.70, upperTipY + 0.64,
+            centerX, upperTipY);
         ctx.closePath();
-        ctx.fillStyle = `rgba(126, 78, 94, ${0.54 + reveal * 0.16})`;
+        ctx.fillStyle = `rgba(178, 134, 146, ${0.22 + foldOpen * 0.12})`;
         ctx.fill();
 
-        // Small connection hints near the fold roots so the fold system reads as
-        // attached to the surrounding skin without drawing a full body-separation line.
+        // Center line with a small Y at the top.
+        const stemTopY = upperTipY - (0.18 + foldOpen * 0.10);
+        const stemBottomY = rootY - 0.02;
+        ctx.beginPath();
+        ctx.moveTo(centerX, stemTopY + 0.24);
+        ctx.lineTo(centerX, stemBottomY);
+        ctx.strokeStyle = 'rgba(183, 140, 150, 0.82)';
+        ctx.lineWidth = 0.46;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(centerX, stemTopY + 0.24);
+        ctx.lineTo(centerX - 0.34, stemTopY - 0.04);
+        ctx.moveTo(centerX, stemTopY + 0.24);
+        ctx.lineTo(centerX + 0.34, stemTopY - 0.04);
+        ctx.strokeStyle = 'rgba(183, 140, 150, 0.78)';
+        ctx.lineWidth = 0.42;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Two slender reactive folds. No closed oval or petal fills: just shaped contour
+        // lines plus a subtle inner crease to give a slight depth cue.
         for (const sign of [-1, 1]) {
-            ctx.beginPath();
-            ctx.moveTo(centerX + sign * 2.05, topY - 0.08);
-            ctx.quadraticCurveTo(centerX + sign * 2.42, topY - 0.38, centerX + sign * 2.66, topY - 0.06);
-            ctx.strokeStyle = 'rgba(176, 124, 114, 0.95)';
-            ctx.lineWidth = 0.55;
-            ctx.stroke();
-        }
+            const rootX = centerX + sign * (rootHalf + 0.12);
+            const tipX = centerX + sign * foldSpread;
+            const tipY = foldTipY;
+            const c1x = centerX + sign * (0.90 + foldOpen * 0.22);
+            const c1y = rootY - 0.62 - pulse * 0.12;
+            const c2x = centerX + sign * (1.64 + foldOpen * 0.84);
+            const c2y = rootY - (1.92 + foldOpen * 0.72);
 
-        // Small side folds: filled softly, but only partially outlined so they no
-        // longer read as upside-down outlined ovals. Their inner edges react to the
-        // gap and response pulse.
-        for (const sign of [1, -1]) {
-            const xOuter = centerX + sign * (1.92 + reveal * 0.12 - pulse * 0.08);
-            const xShoulder = centerX + sign * (2.18 + reveal * 0.12);
-            const xInner = centerX + sign * (0.62 + innerHalf * 0.68 - pulse * 0.16);
-            const xFoot = centerX + sign * (1.02 + innerHalf * 0.22);
-            const shoulderY = topY + 0.12;
-            const subtleWave = pulse * 0.14;
-
+            // Main fold contour.
             ctx.beginPath();
-            ctx.moveTo(xOuter, shoulderY);
-            ctx.bezierCurveTo(xShoulder + sign * 0.36, centerY - 0.26,
-                xShoulder + sign * 0.12, centerY + 0.78,
-                xFoot, footY);
-            ctx.bezierCurveTo(centerX + sign * (0.36 + innerHalf * 0.52),
-                footY - 0.66, xInner,
-                centerY - 0.22 - subtleWave,
-                xOuter, shoulderY);
-            ctx.closePath();
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-
-            // Outer connection contour only: stop before it wraps into a full oval.
-            ctx.beginPath();
-            ctx.moveTo(xOuter + sign * 0.06, shoulderY + 0.30);
-            ctx.bezierCurveTo(xShoulder + sign * 0.22,
-                centerY - 0.42, xShoulder + sign * 0.04,
-                centerY + 0.72, xFoot, footY - 0.02);
+            ctx.moveTo(rootX, rootY + 0.02);
+            ctx.bezierCurveTo(c1x, c1y, c2x, c2y, tipX, tipY);
             ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.56;
+            ctx.lineWidth = 0.78;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.stroke();
 
-            // Inner active contour: this is the main reacting fold line.
+            // Small root link to the surrounding skin near the fold base.
             ctx.beginPath();
-            ctx.moveTo(xOuter + sign * 0.02, shoulderY + 0.44);
-            ctx.bezierCurveTo(centerX + sign * (innerHalf * 0.52),
-                centerY - 0.62, centerX + sign * innerHalf,
-                centerY + 0.86 + subtleWave, xFoot, footY - 0.12);
-            ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.60;
+            ctx.moveTo(rootX, rootY + 0.02);
+            ctx.quadraticCurveTo(centerX + sign * (1.18 + lineLean), rootY + 0.12,
+                centerX + sign * (1.62 + lineLean), rootY + 0.20);
+            ctx.strokeStyle = 'rgba(176, 124, 114, 0.70)';
+            ctx.lineWidth = 0.34;
+            ctx.stroke();
+
+            // Inner crease/shadow cue.
+            ctx.beginPath();
+            ctx.moveTo(centerX + sign * (0.50 + foldOpen * 0.06), rootY + 0.04);
+            ctx.bezierCurveTo(centerX + sign * (0.76 + foldOpen * 0.12), rootY - 0.48,
+                centerX + sign * (1.08 + foldOpen * 0.46), rootY - (1.20 + foldOpen * 0.44),
+                centerX + sign * (1.34 + foldOpen * 0.56), rootY - (2.02 + foldOpen * 0.56));
+            ctx.strokeStyle = `rgba(166, 118, 122, ${0.28 + foldOpen * 0.10})`;
+            ctx.lineWidth = 0.24;
+            ctx.lineCap = 'round';
             ctx.stroke();
         }
         ctx.restore();
