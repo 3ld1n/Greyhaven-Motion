@@ -233,7 +233,7 @@ function buildHiddenContext() {
   }
   const meta = metaParts.join('; ');
   const guide = (s.styleGuide || DEFAULT_STYLE_GUIDE).replaceAll('{{receiver}}', who).replaceAll('{{giver}}', giver);
-  const mechanics = formatEventSummary(sceneEvents.pending(), sceneEvents.status());
+  const mechanics = formatEventSummary(sceneEvents.pending(), sceneEvents.status()).replaceAll('{{receiver}}', who);
   const text = `*${meta}; ${summary}${mechanics ? '; ' + mechanics : ''}; ${guide}*`;
   // Respect an explicitly set giver name in *all* clauses, not only the guide.
   return String(s.giverName || '').trim() ? text.replaceAll('{{user}}', giver) : text;
@@ -411,6 +411,7 @@ function captureScene(fromSim) {
       preFluid: st.cum.preFluid ? {...st.cum.preFluid} : null,
       releaseQueue: st.cum.releaseQueue ? {...st.cum.releaseQueue} : null,
     },
+    response: st.response ? {...st.response} : null,
     pierce: st.pierce,
     wombBroken: st.wombBroken,
     cervixHits: st.cervixHits,
@@ -433,6 +434,7 @@ function restoreScene(toSim, snap) {
   if (snap.cum.preFluid) st.cum.preFluid = {...snap.cum.preFluid};
   st.cum.releaseQueue = snap.cum.releaseQueue ? {...snap.cum.releaseQueue} : null;
   st.cum.particles = (snap.cum.particles || []).map(p => ({...p}));
+  if (snap.response) st.response = {...snap.response};
   st.wombBroken = !!snap.wombBroken;
   toSim.setPierce(snap.pierce);
   st.cervixHits = snap.cervixHits || 0;
@@ -484,6 +486,7 @@ function initGame() {
     jiggleScale: 1.0,
     shaftDamping: 16,
     tightness: s.tightness,
+    responseTightnessMax: s.tightnessMax,
     canalTightness: s.canalTightness,
     virgin: s.virginMode,
     blood: true,
@@ -745,7 +748,11 @@ function mountSettingsPanel() {
       saveSettingsDebounced();
       if (before !== s[spec.value]) {
         if (spec.rebuild) rebuildGame();
-        else if (spec.option) sim?.setOptions?.({ [spec.option]: s[spec.value] });
+        else if (spec.option) sim?.setOptions?.({ [spec.option]: s[spec.value], responseTightnessMax: s.tightnessMax });
+      } else if (spec.value === 'tightness') {
+        // Updating the allowed maximum changes the response peak even when
+        // the base tightness value itself did not change.
+        sim?.setOptions?.({ responseTightnessMax: s.tightnessMax });
       }
     };
     minField.addEventListener('change', () => onChange('min'));
@@ -780,6 +787,8 @@ jQuery(() => {
           <button class="menu_button" id="ghmotion_cum">Cum</button>
           <button class="menu_button" id="ghmotion_break">Break</button>
           <button class="menu_button" id="ghmotion_womb">Womb</button>
+          <button class="menu_button" id="ghmotion_orgasm">Orgasm</button>
+          <button class="menu_button" id="ghmotion_squirt">Squirt</button>
           <button class="menu_button" id="ghmotion_preview_toggle">Prompt</button>
           <button class="menu_button" id="ghmotion_reset">Reset</button>
           <button class="menu_button" id="ghmotion_break_protection">Break protection</button>
@@ -867,7 +876,7 @@ jQuery(() => {
       saveSettingsDebounced();
       if (changed) {
         if (spec.rebuild) rebuildGame();
-        else if (spec.option) sim?.setOptions?.({ [spec.option]: value });
+        else if (spec.option) sim?.setOptions?.({ [spec.option]: value, responseTightnessMax: s.tightnessMax });
       }
     });
   }
@@ -898,6 +907,14 @@ jQuery(() => {
   $('#ghmotion_cum').on('click', safeAction(() => sim?.ejaculate?.()));
   $('#ghmotion_break').on('click', safeAction(() => sim?.armBreak?.()));
   $('#ghmotion_womb').on('click', safeAction(() => sim?.slamToWomb?.()));
+  const responseAction = type => safeAction(() => {
+    if (!sim) return;
+    sim.triggerResponse(type);
+    sceneEvents.recordResponse(type);
+    refreshEventStatus();
+  });
+  $('#ghmotion_orgasm').on('click', responseAction('orgasm'));
+  $('#ghmotion_squirt').on('click', responseAction('squirt'));
   $('#ghmotion_reset').on('click', resetSceneCompletely);
   $('#ghmotion_break_protection').on('click', () => {
     if(sceneEvents.breakProtection('manual')) {

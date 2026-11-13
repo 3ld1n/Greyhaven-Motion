@@ -1,3 +1,23 @@
+# Greyhaven Motion v0.1.19 — Response Waves, Scene Counts & Sharper Tear
+
+## What's new
+- **Sharp V protection opening:** removed the rounded tip-cap film outline across the torn region. The film cutout now uses a true angular V, with straight sides, a slight shoulder bend, and a 230 ms sideways-opening animation that remains at the moving tip. The cutout reveals the shaft pigment below the translucent film.
+- **Orgasm action:** the Actions tab has a new **Orgasm** button. Three short smooth tightening pulses are followed by one final peak held for **3 seconds**, then a smooth relaxation. Tightness rises toward the user's configurable maximum (currently 2× by default) without changing the saved baseline; both outer folds and the X-ray folds react in time with the same wave.
+- **Squirt action:** same timed response envelope with an additional brief decorative water-spray particle effect originating at the same entrance area in both views. The effect is independent of the existing fluid/release counters; particles have a bounded lifetime and a strict cap of 100.
+- **Scene-wide counts:** the event manager separately counts Orgasm and Squirt button presses, recording each event at the scene stroke number. These counts survive individual Record/Stop windows, protection changes and view switches. Only **Reset** clears them. One-time event descriptions are included on the next hidden summary, and cumulative totals are appended to subsequent summaries.
+- **60/120 Hz:** the existing physics-rate selector remains fully supported. The response envelope is driven by elapsed seconds, so switching physics rates does not change its timing.
+- **Unchanged:** initial body silhouette, prior protection/fluid mechanics, prompt replay, default UI settings, motion and detection probabilities.
+
+## Notes and testing
+- `node tests/v019-response-waves.mjs` checks the wave envelope, last-peak hold, physics frame-rate independence, reset behavior, persistent counts, and the single sharp tear rendering path.
+- Run **all** `tests/*.mjs` to check regressions from previous releases; all seven suites passed during packaging.
+- `tests/visual-smoke-v019.html` is provided for an optional local browser smoke check. Headless Chromium could not complete a screenshot in the build environment; therefore final appearance must be reviewed in SillyTavern on the target device.
+- This is a stylized fictional simulation. Timing and visual effects are design choices, not claims about real physiology.
+
+**Install:** Back up the current extension folder, replace its files with this ZIP's root contents, then reload SillyTavern. Saved settings remain in SillyTavern and are not erased. Press Reset to start a clean test scene.
+
+---
+
 # Greyhaven Motion v0.1.18 — Tear, Particle Continuity & 60/120 Hz Physics
 
 ## v0.1.18 fixes

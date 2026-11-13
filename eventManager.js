@@ -29,6 +29,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
   const opts = { ...DEFAULT_RISKS, ...DEFAULT_RANGES, ...options };
   normalizeRanges(opts);
   let id = 0, seq = 0, reportedId=0, strokeCount=0, lastStrokeAt=null;
+  let responses = {orgasm:0,squirt:0};
   let log=[];
   let protection=null, preFluid=null;
   const randint=(min,max)=>min+Math.floor(clamp(random(),0,0.999999999)*(max-min+1));
@@ -53,7 +54,7 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
     normalizeRanges(opts);
   }
   function reset(enabled=false) { seq++; log=[]; id=0; reportedId=0; strokeCount=0; lastStrokeAt=null;
-    protection=null; preFluid=null; setProtection(enabled,false); }
+    protection=null; preFluid=null; responses={orgasm:0,squirt:0}; setProtection(enabled,false); }
   function schedule(cause, after) {
     if(!protection?.active || protection.broken) return false;
     const target=protection.strokes+after;
@@ -114,14 +115,19 @@ export function createEventManager({ random=Math.random, options={}, protectedIn
     if(protection.scheduled?.target<=protection.strokes) breakProtection(protection.scheduled.cause);
     return !!protection.broken;
   }
+  function recordResponse(type='orgasm') {
+    const kind=type==='squirt'?'squirt':'orgasm';
+    responses[kind]++;
+    return emit(kind,{count:responses[kind]});
+  }
   function pending() { return log.filter(e=>e.id>reportedId).map(e=>({...e})); }
   function markReported(){reportedId=id;}
   function status(){return { protection:protection ? (protection.broken?'broken':'intact'):'off',
     protectionStrokes:protection?.strokes||0, protectionReleases:protection?.releases||0,
     preFluid: preFluid?.happened?'occurred':preFluid?.eligible?'pending':'disabled',
-    fluidReachedDepth:!!preFluid?.reachedDepth, pendingCount:pending().length}; }
+    fluidReachedDepth:!!preFluid?.reachedDepth, responseCounts:{...responses}, sceneStrokeCount:strokeCount, pendingCount:pending().length}; }
   reset(protectedInitially);
-  return {configure,reset,setProtection,onStroke,onDepth,onProtectedRelease,breakProtection,pending,markReported,status,
+  return {configure,reset,setProtection,onStroke,onDepth,onProtectedRelease,breakProtection,recordResponse,pending,markReported,status,
     getEvents:()=>log.map(e=>({...e})), debugSnapshot:()=>({protection:protection&&{...protection},preFluid:preFluid&&{...preFluid},strokeCount})};
 }
 export function formatEventSummary(events, status) {
@@ -132,7 +138,11 @@ export function formatEventSummary(events, status) {
     if(e.type==='protection-removed') lines.push('protection was removed');
     if(e.type==='pre-fluid') lines.push(`pre-ejaculate event on scene stroke ${e.stroke} at approximately ${Math.round(e.atDepth*100)}% relative depth`);
     if(e.type==='pre-fluid-depth-changed') lines.push(`after the earlier fluid event, the scene reached approximately ${Math.round(e.atDepth*100)}% relative depth`);
+    if(e.type==='orgasm') lines.push(`{{receiver}} had an orgasm at scene stroke ${e.stroke}`);
+    if(e.type==='squirt') lines.push(`{{receiver}} had an intense orgasm at scene stroke ${e.stroke}, with a squirting response`);
   }
   if(status.protection==='broken') lines.push('current protection state: broken');
+  if(status.responseCounts && (status.responseCounts.orgasm || status.responseCounts.squirt))
+    lines.push(`scene totals: orgasms ${status.responseCounts.orgasm || 0}, squirting responses ${status.responseCounts.squirt || 0}`);
   return lines.join('; ');
 }

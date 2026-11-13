@@ -4,6 +4,8 @@
 // from the lower right angled up-left; womb sits past the canal end.
 // The renderer (render2d.js or a future three.js one) only reads state.
 
+import { sampleResponseWave } from './responseWave.js';
+
 const SCENE_W = 100;
 const SCENE_H = 60;
 
@@ -150,6 +152,7 @@ export function createSim(userOpts = {}) {
         pierce: false,                        // cervix penetration enabled
         maxDepth: MAX_N_EFF,
         cum: { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false, duration: 1.8, travelFrom: null }, releaseQueue: null },
+        response: { type: null, elapsed: 0, strength: 0, hold: false, active: false, spray: false },
         // --- resistance model (scene-persistent until resetScene) ---
         maxReach: 0,          // frontier: deepest point ever stretched this scene
         loose: 0,             // 0 untouched-tight .. 1 worked loose (cum = lube)
@@ -222,6 +225,7 @@ export function createSim(userOpts = {}) {
     }
 
     function resetScene() {
+        st.response = { type: null, elapsed: 0, strength: 0, hold: false, active: false, spray: false };
         resetFluids();
         st.maxReach = 0;
         st.loose = 0;
@@ -384,8 +388,26 @@ export function createSim(userOpts = {}) {
         st.cum = { vag: 0, womb: 0, leak: 0, spurting: 0, spawnAcc: 0, particles: [], vagCount: 0, wombCount: 0, condom: 0, condomCount: 0, preFluid: { active: false, deep: false, atDepth: 0, animation: 0, transferred: false, duration: 1.8, travelFrom: null }, releaseQueue: null };
     }
 
+    function triggerResponse(type = 'orgasm') {
+        const kind = type === 'squirt' ? 'squirt' : 'orgasm';
+        st.response = {type: kind, elapsed: 0, strength: 0, hold: false, active: true, spray: kind === 'squirt'};
+        emit('response', {type: kind});
+        return true;
+    }
+
     function step(dt) {
         st.time += dt;
+        if (st.response.active) {
+            st.response.elapsed += dt;
+            const next = sampleResponseWave(st.response.elapsed);
+            st.response.strength = next.strength;
+            st.response.hold = next.hold;
+            st.response.active = next.active;
+            st.response.spray = st.response.type === 'squirt' && next.spray;
+        }
+        // Temporary pulse affects the physics but never overwrites the user's
+        // configured baseline. Once the envelope ends, exact baseline resumes.
+        const currentTightness = opts.tightness + Math.max(0, (opts.responseTightnessMax ?? 2) - opts.tightness) * st.response.strength;
 
         // Shaft depth spring (gives the pointer motion weight)
         const k = opts.shaftStiffness, c = opts.shaftDamping;
@@ -393,7 +415,7 @@ export function createSim(userOpts = {}) {
         // ================= resistance model =================
         st.hymen.present = opts.virgin && !st.hymen.broken;
         const virginMul = st.hymen.present ? 1.6 : 1;
-        const tight = opts.tightness * (1 - st.loose * 0.75) * virginMul;
+        const tight = currentTightness * (1 - st.loose * 0.75) * virginMul;
 
         // Grip: every rib of wall in contact drags on the shaft — the deeper
         // you are, the more wall is gripping, the harder every motion gets.
@@ -416,9 +438,9 @@ export function createSim(userOpts = {}) {
             const pushing = st.dTarget > st.d + 0.3;
             if (inZone && pushing) {
                 const push = k * (st.dTarget - st.d);
-                const gateHold = Math.max(0, 240 * opts.tightness * virginMul * (1 - st.gate.strain)) * resistMul;
+                const gateHold = Math.max(0, 240 * currentTightness * virginMul * (1 - st.gate.strain)) * resistMul;
                 force -= gateHold;
-                st.gate.strain = Math.min(1, st.gate.strain + push * dt / (900 * opts.tightness * virginMul));
+                st.gate.strain = Math.min(1, st.gate.strain + push * dt / (900 * currentTightness * virginMul));
                 st.gate.strainSec += dt;
                 st.gate.wasActive = true;
             } else if (st.gate.wasActive && st.dTarget < st.d - 1) {
@@ -444,8 +466,8 @@ export function createSim(userOpts = {}) {
                 const over = st.d - HX;
                 // live stretch follows the tip (springs back when he retreats)
                 st.hymen.stretch += (Math.min(HY_RANGE, over) - st.hymen.stretch) * Math.min(1, dt * 14);
-                force -= 450 * opts.tightness * over * resistMul;
-                extraDrag += 150 * Math.min(1, over / HY_RANGE) * opts.tightness * resistMul;
+                force -= 450 * currentTightness * over * resistMul;
+                extraDrag += 150 * Math.min(1, over / HY_RANGE) * currentTightness * resistMul;
                 st.hymen.strainSec += dt;
                 // overstretch counting: reaching the limit counts once per push
                 if (st.d >= HY_MAX - 0.15) {
@@ -548,8 +570,8 @@ export function createSim(userOpts = {}) {
             if (ov > 0 && st.dTarget > st.d) force -= ov * 240 * resistMul;
             const oster = st.d - MAX_NORMAL;
             if (oster > 0) {
-                force -= 420 * opts.tightness * oster * resistMul;
-                extraDrag += 130 * Math.min(1, oster / Math.max(0.5, CV_MAX - MAX_NORMAL)) * opts.tightness * resistMul;
+                force -= 420 * currentTightness * oster * resistMul;
+                extraDrag += 130 * Math.min(1, oster / Math.max(0.5, CV_MAX - MAX_NORMAL)) * currentTightness * resistMul;
             }
             if (st.d >= CV_MAX - 0.15) {
                 if (!cervixAtLimit && st.dVel > 1) {
@@ -572,8 +594,8 @@ export function createSim(userOpts = {}) {
             // womb far wall: stretches past the tip-limit, counts trips
             const ov = st.d - WOMB_TIP_LIMIT;
             if (ov > 0) {
-                force -= 420 * opts.tightness * ov * resistMul;
-                extraDrag += 130 * Math.min(1, ov / Math.max(0.5, WT_MAX - WOMB_TIP_LIMIT)) * opts.tightness * resistMul;
+                force -= 420 * currentTightness * ov * resistMul;
+                extraDrag += 130 * Math.min(1, ov / Math.max(0.5, WT_MAX - WOMB_TIP_LIMIT)) * currentTightness * resistMul;
             }
             if (st.d >= WT_MAX - 0.15) {
                 if (!wombAtLimit && st.dVel > 1) {
@@ -814,7 +836,8 @@ export function createSim(userOpts = {}) {
         for (let i = 0; i < stations.length; i++) {
             const s = stations[i];
             const wl = stations[i - 1], wr = stations[i + 1];
-            const effRest = s.rest * closeMul;
+            const responseContraction = st.response.strength * (st.response.hold ? 1 : 0.82 + 0.18 * Math.sin(st.response.elapsed * 16 - s.s * 0.36));
+            const effRest = s.rest * closeMul * (1 - 0.50 * Math.max(0, responseContraction));
             for (const side of ['t', 'b']) {
                 const w = side === 't' ? s.wt : s.wb;
                 const wv = side === 't' ? s.vt : s.vb;
@@ -883,7 +906,7 @@ export function createSim(userOpts = {}) {
 
     return {
         state: st, update, setTarget, nudgeTarget, on, setOptions,
-        setPierce, ejaculate, ruptureProtection, registerPreFluid, advancePreFluid,
+        setPierce, ejaculate, ruptureProtection, registerPreFluid, advancePreFluid, triggerResponse,
         slamToWomb, armBreak, resetFluids, resetScene, setVirgin, setUpdateHz,
         SCENE_W, SCENE_H,
     };

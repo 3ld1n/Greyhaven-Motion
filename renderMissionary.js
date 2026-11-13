@@ -60,6 +60,8 @@ export function createMissionaryRenderer(canvas) {
     let lastT = performance.now();
     const wombDrops = []; // womb-local coords {x,y,vx,vy}
     const leakDrops = []; // scene coords {x,y,vy}
+    const responseDrops = []; // short-lived decorative spray, separate from release fluid
+    let responseSpawnAcc = 0;
     let leakAcc = 0, puddle = 0;
     const disp = { contact: 0, pelvisX: 0, pelvisY: 0, thighL: 0, thighR: 0, open: 0 };
 
@@ -122,7 +124,7 @@ export function createMissionaryRenderer(canvas) {
     // Both the film cutout and its two opened edges share the same coordinates.
     // No separate overlay is ever drawn at the entrance in non-X-ray mode.
     function protectionTearGeometry(spine, now) {
-        if (!protectionBroken || spine.length < 4) return null;
+        if (!protectionBroken || spine.length < 5) return null;
         const tip = spine[1].pos;
         const a = spine[0].pos, b = spine[3].pos;
         const dx = b.x - a.x, dy = b.y - a.y;
@@ -130,55 +132,59 @@ export function createMissionaryRenderer(canvas) {
         const t = { x: dx / norm, y: dy / norm };
         const n = { x: -t.y, y: t.x };
         const ms = tearStartedAt === null ? 999 : Math.max(0, now - tearStartedAt);
-        // Closed -> two quick opposite sideways pulls; stays visibly open.
-        const phase = Math.min(1, ms / 240);
+        // The two film edges separate OUTWARDS from the center; final opening
+        // is a crisp V instead of the soft U-like notch of v0.1.18.
+        const phase = Math.min(1, ms / 230);
         const opened = 1 - Math.pow(1 - phase, 3);
-        const width = 0.07 + 0.91 * opened;
+        const halfW = 0.025 + 1.23 * opened;
         const pt = (along, side) => ({
             x: tip.x + t.x * along + n.x * side,
             y: tip.y + t.y * along + n.y * side,
         });
         return {
-            leftTop: pt(-0.54, width), rightTop: pt(-0.54, -width),
-            leftMid: pt(0.27, width * 0.83), rightMid: pt(0.27, -width * 0.83),
-            leftBottom: pt(0.91, width * 0.37), rightBottom: pt(0.91, -width * 0.37),
-            leftFlap: pt(0.40, width + 0.18 + 0.22 * opened),
-            rightFlap: pt(0.40, -(width + 0.18 + 0.22 * opened)),
+            leftTop: pt(-0.72, halfW), rightTop: pt(-0.72, -halfW),
+            leftBend: pt(0.12, halfW * 0.80), rightBend: pt(0.12, -halfW * 0.80),
+            apex: pt(1.02, 0),
+            leftFlap: pt(-0.32, halfW + 0.18 + 0.34 * opened),
+            rightFlap: pt(-0.32, -(halfW + 0.18 + 0.34 * opened)),
             opened,
         };
     }
 
     function traceProtectionCutout(g) {
-        // A genuine hole in the translucent film; Canvas even-odd filling
-        // leaves the original skin tone showing through instead of painting a
-        // fake darker patch over the shaft.
+        // Strictly angular, open V-shaped cutout in the translucent film.
+        // Even-odd filling leaves the actual shaft pigment showing beneath it.
         ctx.moveTo(g.leftTop.x, g.leftTop.y);
-        ctx.quadraticCurveTo(g.leftMid.x, g.leftMid.y, g.leftBottom.x, g.leftBottom.y);
-        ctx.quadraticCurveTo((g.leftBottom.x + g.rightBottom.x)/2,
-            (g.leftBottom.y + g.rightBottom.y)/2 + 0.02,
-            g.rightBottom.x, g.rightBottom.y);
-        ctx.quadraticCurveTo(g.rightMid.x, g.rightMid.y, g.rightTop.x, g.rightTop.y);
+        ctx.lineTo(g.leftBend.x, g.leftBend.y);
+        ctx.lineTo(g.apex.x, g.apex.y);
+        ctx.lineTo(g.rightBend.x, g.rightBend.y);
+        ctx.lineTo(g.rightTop.x, g.rightTop.y);
         ctx.closePath();
     }
 
     function drawProtectionTear(g) {
-        // Light blue lips pull away sideways from the central gap, exactly
-        // following the same glans coordinates as the protection film.
+        // Straight edges meeting at a sharp apex; small hard bends at the two
+        // shoulders make the separated film lips read as physically split.
         ctx.beginPath();
-        ctx.moveTo(g.leftTop.x, g.leftTop.y);
-        ctx.quadraticCurveTo(g.leftFlap.x, g.leftFlap.y, g.leftBottom.x, g.leftBottom.y);
-        ctx.moveTo(g.rightTop.x, g.rightTop.y);
-        ctx.quadraticCurveTo(g.rightFlap.x, g.rightFlap.y, g.rightBottom.x, g.rightBottom.y);
-        ctx.lineWidth = 0.76;
-        ctx.strokeStyle = 'rgba(100,183,243,0.94)';
+        ctx.moveTo(g.leftFlap.x, g.leftFlap.y);
+        ctx.lineTo(g.leftTop.x, g.leftTop.y);
+        ctx.lineTo(g.leftBend.x, g.leftBend.y);
+        ctx.lineTo(g.apex.x, g.apex.y);
+        ctx.moveTo(g.rightFlap.x, g.rightFlap.y);
+        ctx.lineTo(g.rightTop.x, g.rightTop.y);
+        ctx.lineTo(g.rightBend.x, g.rightBend.y);
+        ctx.lineTo(g.apex.x, g.apex.y);
+        ctx.lineWidth = 0.66;
+        ctx.strokeStyle = 'rgba(99,185,246,0.95)';
         ctx.stroke();
+        // A thin, slightly darker inner edge is confined to the V, not across
+        // the exposed skin. No extra tip outline is painted over the hole.
         ctx.beginPath();
-        ctx.moveTo(g.leftTop.x, g.leftTop.y);
-        ctx.quadraticCurveTo(g.leftMid.x, g.leftMid.y, g.leftBottom.x, g.leftBottom.y);
-        ctx.moveTo(g.rightTop.x, g.rightTop.y);
-        ctx.quadraticCurveTo(g.rightMid.x, g.rightMid.y, g.rightBottom.x, g.rightBottom.y);
-        ctx.lineWidth = 0.28;
-        ctx.strokeStyle = 'rgba(34,99,157,0.93)';
+        ctx.moveTo(g.leftBend.x, g.leftBend.y);
+        ctx.lineTo(g.apex.x, g.apex.y);
+        ctx.lineTo(g.rightBend.x, g.rightBend.y);
+        ctx.lineWidth = 0.22;
+        ctx.strokeStyle = 'rgba(31,91,153,0.90)';
         ctx.stroke();
     }
 
@@ -715,12 +721,18 @@ export function createMissionaryRenderer(canvas) {
                 if (tear) traceProtectionCutout(tear);
                 ctx.fillStyle = 'rgba(120, 190, 255, 0.18)';
                 ctx.fill('evenodd');
-                // Trace only the film's outside border. The opening is drawn
-                // separately, not as a second overlaid symbol.
+                // Do not trace the film outline across its torn tip. An
+                // intact rounded cap here would visibly cover the exposed
+                // skin even when the film fill has a proper hole.
                 ctx.beginPath();
-                smoothPath(ctx, topEdge);
-                smoothPath(ctx, [...botEdge].reverse(), true);
-                ctx.closePath();
+                if (tear) {
+                    smoothPath(ctx, topEdge.slice(3));
+                    smoothPath(ctx, botEdge.slice(3));
+                } else {
+                    smoothPath(ctx, topEdge);
+                    smoothPath(ctx, [...botEdge].reverse(), true);
+                    ctx.closePath();
+                }
                 ctx.strokeStyle = 'rgba(120, 190, 255, 0.45)';
                 ctx.lineWidth = 0.45;
                 ctx.stroke();
@@ -853,10 +865,15 @@ export function createMissionaryRenderer(canvas) {
             const w = stations[i];
             for (const m of [1, -1]) {
                 const gap = m === 1 ? w.gapT : w.gapB;
+                // A small axial phase offset makes a response pulse travel
+                // down the fold pattern, rather than moving every rib at once.
+                const wave = (s.response?.strength || 0) * (s.response?.hold ? 1 :
+                    0.78 + 0.22 * Math.cos((s.response?.elapsed || 0) * 17 - i * 0.60));
+                const inset = Math.max(0, wave) * 0.42;
                 ctx.beginPath();
                 ctx.ellipse(
-                    w.pos.x + m * w.n.x * (gap + 0.75) + s.jig.x * 0.35,
-                    w.pos.y + m * w.n.y * (gap + 0.75) + s.jig.y * 0.35,
+                    w.pos.x + m * w.n.x * (gap + 0.75 - inset) + s.jig.x * 0.35,
+                    w.pos.y + m * w.n.y * (gap + 0.75 - inset) + s.jig.y * 0.35,
                     1.05, ribSpacing * 0.42,
                     Math.atan2(w.tan.y, w.tan.x) + Math.PI / 2,
                     0, Math.PI * 2);
@@ -939,8 +956,9 @@ export function createMissionaryRenderer(canvas) {
         for (const sign of [1, -1]) {
             const gap = sign === 1 ? st0.gapT : st0.gapB;
             const nn = { x: n0.x * sign, y: n0.y * sign };
-            const cx = E.x + nn.x * (gap + 0.7) + out.x * 0.4;
-            const cy = E.y + nn.y * (gap + 0.7) + out.y * 0.4;
+            const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
+            const cx = E.x + nn.x * (gap + 0.7 - contraction) + out.x * 0.4;
+            const cy = E.y + nn.y * (gap + 0.7 - contraction) + out.y * 0.4;
             ctx.beginPath();
             ctx.ellipse(cx, cy, 1.7, 3.1, sign * 0.22, 0, Math.PI * 2);
             ctx.fillStyle = PAL.skin;
@@ -950,6 +968,27 @@ export function createMissionaryRenderer(canvas) {
             ctx.stroke();
         }
         ctx.restore();
+
+        // Gentle rhythmic highlight on the outer folds. Its intensity follows
+        // the same physical wave as the temporary tightening; no independent
+        // oscillator can drift out of phase.
+        const responseStrength = Math.max(0, s.response?.strength || 0);
+        if (responseStrength > 0.05) {
+            ctx.save();
+            ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
+            for (const m of [-1, 1]) {
+                const nn = {x: n0.x * m, y: n0.y * m};
+                const gap = m === 1 ? st0.gapT : st0.gapB;
+                const c = { x: E.x + nn.x * (gap + 1.55 - responseStrength * 0.9) + out.x * 0.4,
+                            y: E.y + nn.y * (gap + 1.55 - responseStrength * 0.9) + out.y * 0.4 };
+                ctx.beginPath();
+                ctx.ellipse(c.x, c.y, 0.34, 1.30, m * 0.22, -0.9, 0.9);
+                ctx.strokeStyle = `rgba(255,235,240,${0.14 + responseStrength * 0.27})`;
+                ctx.lineWidth = 0.27;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
 
         // Intentionally NO separate external tear overlay: the true tip tear
         // is already rendered in the shaft layer and occluded by the normal
@@ -1005,6 +1044,41 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
+        // Decorative spray for the optional stronger response. Both views
+        // reuse the same moving entrance point below the visible rim; the
+        // particles are never spawned behind a non-X-ray cover.
+        const sprayActive = !!s.response?.spray;
+        if (sprayActive) {
+            responseSpawnAcc += dt * (23 + responseStrength * 30);
+            while (responseSpawnAcc >= 1 && responseDrops.length < 100) {
+                responseSpawnAcc--;
+                responseDrops.push({
+                    x: E.x + pelvisSway * 0.8 + (Math.random()-0.5) * 1.15,
+                    y: E.y + 2.15 + pelvisBounce * 0.85,
+                    vx: (Math.random()-0.5) * 19,
+                    vy: 4 + Math.random() * 16,
+                    age: 0,
+                    life: 0.62 + Math.random() * 0.62,
+                    r: 0.23 + Math.random() * 0.17,
+                });
+            }
+        } else responseSpawnAcc = 0;
+        for (let i = responseDrops.length - 1; i >= 0; --i) {
+            const p = responseDrops[i];
+            p.age += dt;
+            if (p.age >= p.life || p.y > SCENE_H + 4) {
+                responseDrops.splice(i,1);
+                continue;
+            }
+            p.vy += 23 * dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            const fade = Math.min(1, 1 - p.age / p.life);
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, p.r, p.r * 1.65, p.vx * 0.012, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(219,244,253,${0.76 * fade})`;
+            ctx.fill();
+        }
     }
 
     function destroy() { ro.disconnect(); }
