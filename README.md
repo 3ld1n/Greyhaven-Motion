@@ -249,3 +249,11 @@ Missionary-only MVP for SillyTavern.
 - added a separate depth opening under-layer plus separate rim/fold over-layers so the shaft can still disappear at depth
 - lip/fold motion now morphs locally from closed -> slightly open -> active open using real-time depth/contact instead of one bouncing block
 - mirrored the new entrance look in both non-X-ray and X-ray modes while preserving the approved body and shaft occlusion logic
+
+## v0.1.31 — Entrance contour and layering hotfix
+- **Body contour redraw** is now a short, gently curved, stationary path rather than a linear foreground overlay. The older inner V outline is excluded from the thigh *stroke* only; the original thigh fill, shape, and off-screen extension remain untouched.
+- **Foreground order corrected:** the replacement body contour draws after the original entrance skin cover but clips out the moving object, so its line no longer crosses over that object.
+- **Extra animated diagonals and tilted inner crease strokes removed.** The remaining local fold contour is short and independently responsive.
+- **Y detail realigned:** its two arms join the same upper point as the stem rather than forming a lower, detached V.
+- **Upper opening made more visible:** filled rounded upper oval, larger curved rim and separate small central peak.
+- **Real-time input and old physics preserved.** The standalone rendering checks sampled initial closed, shallow, medium, deep, withdrawn, and X-ray states. These checks do not guarantee the appearance on every phone; visually inspect before treating as a final design.

@@ -334,84 +334,116 @@ export function createMissionaryRenderer(canvas) {
             }
         }
 
-        function drawEntranceOverlay() {
-            // New thigh-border covers: fixed to the body. A wide skin stroke first
-            // hides the older underlying outline, then the visible border is redrawn.
-            for (const sign of [-1, 1]) {
+        function drawBodyAttachedBorders() {
+            // Stationary cosmetic replacement for the small legacy V contour.
+            // This belongs to the body, not the moving shaft or front fold layer.
+            // Leave the approved thigh drawing itself unchanged.
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            for (const side of [-1, 1]) {
+                const X = offset => E.x + side * offset;
+                const bottom = E.y + 4.54;
+                const top = E.y - 5.22;
                 ctx.beginPath();
-                ctx.moveTo(E.x + sign * 1.15, E.y + 3.78);
-                ctx.quadraticCurveTo(E.x + sign * 3.10, E.y + 0.90, E.x + sign * 5.30, E.y - 1.80);
-                ctx.quadraticCurveTo(E.x + sign * 6.85, E.y - 3.80, E.x + sign * 8.25, E.y - 5.45);
-                ctx.strokeStyle = PAL.skin;
-                ctx.lineWidth = 3.4;
-                ctx.stroke();
+                ctx.moveTo(X(2.05), bottom);
+                ctx.bezierCurveTo(X(2.18), E.y + 2.14,
+                    X(3.33), E.y - 0.34,
+                    X(4.37), E.y - 1.74);
+                ctx.bezierCurveTo(X(5.22), E.y - 3.06,
+                    X(6.56), E.y - 4.46,
+                    X(7.36), top);
                 ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.82;
+                ctx.lineWidth = 0.78;
                 ctx.stroke();
             }
+            ctx.restore();
+        }
 
-            // Closed-state center line + slight Y tip. It fades away as soon as the
-            // lips are actively opening.
+        function drawEntranceOverlay() {
+            // The Y detail belongs to the closed pose. The fork joins the top
+            // of the stem; there is no lower detached V-shaped cap.
             if (lineFade > 0.02) {
+                const yJunction = E.y - 3.94;
                 ctx.beginPath();
-                ctx.moveTo(E.x, E.y - 3.55);
-                ctx.lineTo(E.x, E.y + 1.18);
-                ctx.strokeStyle = `rgba(178,90,114,${0.55 * lineFade})`;
-                ctx.lineWidth = 0.62;
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.moveTo(E.x - 0.56 * lineFade, E.y - 3.28);
-                ctx.lineTo(E.x, E.y - 2.68);
-                ctx.lineTo(E.x + 0.56 * lineFade, E.y - 3.28);
+                ctx.moveTo(E.x, yJunction);
+                ctx.lineTo(E.x, E.y + 0.78);
+                ctx.moveTo(E.x - 0.45, yJunction - 0.52);
+                ctx.quadraticCurveTo(E.x - 0.12, yJunction - 0.18, E.x, yJunction);
+                ctx.moveTo(E.x + 0.45, yJunction - 0.52);
+                ctx.quadraticCurveTo(E.x + 0.12, yJunction - 0.18, E.x, yJunction);
                 ctx.strokeStyle = `rgba(178,90,114,${0.58 * lineFade})`;
-                ctx.lineWidth = 0.56;
+                ctx.lineCap = 'round';
+                ctx.lineWidth = 0.57;
                 ctx.stroke();
             }
 
             if (rimReveal > 0.02) {
-                // Rim / top opening shape.
+                // Larger, genuinely filled upper opening. The arched top
+                // expands by moving its independent curve points, not by zooming.
+                const topY = E.y - 4.10;
+                const upperHalf = 1.78 + rimReveal * 0.72;
+                const lipHalf = 2.28 + rimReveal * 1.16;
+                const lipY = E.y + 1.30;
                 ctx.beginPath();
-                ctx.moveTo(E.x - (1.55 + rimReveal * 0.95), E.y + 1.38);
-                ctx.quadraticCurveTo(E.x - 0.78, E.y + 0.80, E.x, E.y + 0.48);
-                ctx.quadraticCurveTo(E.x + 0.78, E.y + 0.80, E.x + (1.55 + rimReveal * 0.95), E.y + 1.38);
-                ctx.quadraticCurveTo(E.x + 0.70, E.y + 1.92, E.x, E.y + 2.05);
-                ctx.quadraticCurveTo(E.x - 0.70, E.y + 1.92, E.x - (1.55 + rimReveal * 0.95), E.y + 1.38);
+                ctx.moveTo(E.x - upperHalf * 0.46, topY + 0.24);
+                // Rounded top and curved sides: a visible oval-like opening,
+                // rather than the previous pointed and almost invisible hood.
+                ctx.bezierCurveTo(E.x - upperHalf * 0.27, topY - 0.22,
+                    E.x + upperHalf * 0.27, topY - 0.22,
+                    E.x + upperHalf * 0.46, topY + 0.24);
+                ctx.bezierCurveTo(E.x + upperHalf * 1.03, topY + 1.12,
+                    E.x + upperHalf * 1.00, E.y - 1.22,
+                    E.x + lipHalf * 0.82, lipY - 0.12);
+                ctx.quadraticCurveTo(E.x, lipY + 0.18,
+                    E.x - lipHalf * 0.82, lipY - 0.12);
+                ctx.bezierCurveTo(E.x - upperHalf * 1.00, E.y - 1.22,
+                    E.x - upperHalf * 1.03, topY + 1.12,
+                    E.x - upperHalf * 0.46, topY + 0.24);
                 ctx.closePath();
-                ctx.fillStyle = `rgba(189, 120, 150, ${0.40 + rimReveal * 0.20})`;
+                ctx.fillStyle = `rgba(219,162,175,${0.22 + rimReveal * 0.18})`;
                 ctx.fill();
-                ctx.strokeStyle = `rgba(142,47,82,${0.32 + rimReveal * 0.18})`;
-                ctx.lineWidth = 0.40;
+
+                // Small central peak creates a curved triangular edge,
+                // independent from the surrounding larger opening.
+                ctx.beginPath();
+                ctx.moveTo(E.x - lipHalf * 0.86, lipY + 0.05);
+                ctx.quadraticCurveTo(E.x - lipHalf * 0.38, E.y + 0.15,
+                    E.x, E.y - 0.57);
+                ctx.quadraticCurveTo(E.x + lipHalf * 0.38, E.y + 0.15,
+                    E.x + lipHalf * 0.86, lipY + 0.05);
+                ctx.quadraticCurveTo(E.x, lipY + 0.28,
+                    E.x - lipHalf * 0.86, lipY + 0.05);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(144,81,107,${0.33 + rimReveal * 0.17})`;
+                ctx.fill();
+
+                // Broad curved rim, kept within the new fold roots.
+                ctx.beginPath();
+                ctx.moveTo(E.x - lipHalf, lipY);
+                ctx.quadraticCurveTo(E.x - lipHalf * 0.52, E.y + 0.58,
+                    E.x, E.y + 0.41);
+                ctx.quadraticCurveTo(E.x + lipHalf * 0.52, E.y + 0.58,
+                    E.x + lipHalf, lipY);
+                ctx.strokeStyle = `rgba(153,77,103,${0.44 + rimReveal * 0.28})`;
+                ctx.lineWidth = 0.56;
+                ctx.lineCap = 'round';
                 ctx.stroke();
             }
 
-            // Thin inner creases, kept separate from the outer fold strokes.
-            if (lipsOpen > 0.10) {
-                for (const sign of [-1, 1]) {
-                    ctx.beginPath();
-                    ctx.moveTo(E.x + sign * (0.88 + rimReveal * 0.18), E.y + 1.35);
-                    ctx.quadraticCurveTo(E.x + sign * (1.05 + lipsOpen * 0.65), E.y - 0.05, E.x + sign * (1.55 + lipsOpen * 0.95), E.y - 2.35 - lipsOpen * 0.55);
-                    ctx.strokeStyle = `rgba(207, 167, 179, ${0.55})`;
-                    ctx.lineWidth = 0.34;
-                    ctx.stroke();
-                }
-            }
-
-            // Main folds: local morph only. They do not scale the whole entrance block.
-            for (const sign of [-1, 1]) {
-                const startX = E.x + sign * (1.48 + rimReveal * 0.18);
-                const startY = E.y + 1.55;
-                const endX = E.x + sign * mix(2.55, 8.05, lipsOpen);
-                const endY = mix(E.y - 3.65, E.y - 5.55, lipsOpen);
+            // Short local fold contours only. Old long diagonal animated
+            // strokes and duplicate inner crease lines have been removed.
+            for (const side of [-1, 1]) {
+                const rootX = E.x + side * (2.44 + rimReveal * 0.52);
                 ctx.beginPath();
-                ctx.moveTo(startX, startY);
+                ctx.moveTo(rootX, E.y + 1.42);
                 ctx.bezierCurveTo(
-                    E.x + sign * mix(1.95, 2.70, lipsOpen), E.y + 0.65,
-                    E.x + sign * mix(4.20, 5.95, lipsOpen), E.y - 2.60 - lipsOpen * 0.30,
-                    endX, endY
+                    E.x + side * (2.10 + lipsOpen * 0.18), E.y + 0.45,
+                    E.x + side * (2.00 + lipsOpen * 0.26), E.y - 1.48,
+                    E.x + side * (2.48 + lipsOpen * 0.18), E.y - 2.88
                 );
                 ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 1.28;
+                ctx.lineWidth = 0.98;
                 ctx.lineCap = 'round';
                 ctx.stroke();
             }
@@ -493,7 +525,31 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
             ctx.strokeStyle = PAL.skinLine;
             ctx.lineWidth = 0.8;
+            // Suppress ONLY the former inner V border in the local entrance zone.
+            // Keep the exact thigh fill/path and all other outlines untouched.
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(-20, -20, 140, 120);
+            ctx.moveTo(X(39.8), 38.3);
+            ctx.lineTo(X(50.8), 38.3);
+            ctx.lineTo(X(50.8), 51.8);
+            ctx.lineTo(X(45.0), 51.8);
+            ctx.closePath();
+            ctx.clip('evenodd');
+            ctx.beginPath();
+            ctx.moveTo(X(37), 35.0);
+            ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
+            ctx.quadraticCurveTo(X(0), 53.2 + Math.abs(thighPulse) * 0.10, X(-2), 63);
+            ctx.lineTo(X(-4), 73.5);
+            ctx.lineTo(X(31.5), 73.5);
+            ctx.lineTo(X(30), 63);
+            ctx.quadraticCurveTo(X(42), 58.0 - thighPulse * 0.14, X(47.6), 52.0 - thighPulse * 0.15 - thighLag * m * 0.10);
+            ctx.quadraticCurveTo(X(49.25), 50.1 - thighPulse * 0.14 - thighLag * m * 0.12, X(49.15), 48.9 - innerPinch);
+            ctx.quadraticCurveTo(X(46.2), 43.7 - thighPulse * 0.07, X(41.6), 39.6 - thighPulse * 0.05);
+            ctx.quadraticCurveTo(X(39.2), 36.6, X(37), 35.0);
+            ctx.closePath();
             ctx.stroke();
+            ctx.restore();
             ctx.restore();
         }
 
@@ -1070,9 +1126,23 @@ export function createMissionaryRenderer(canvas) {
 
         }
 
-        // Final external entrance artwork: fixed thigh-border covers + folds/rim over the shaft.
+        // Static contour replacement. Draw after the entry skin cover, but
+        // clip out the moving object's footprint: the contour cannot overlay it.
         ctx.save();
         ctx.translate(pelvisSway, pelvisBounce);
+        if (s.inside && s.d > 0) {
+            const coverWidth = Math.max(2.6, s.shaftRadius(Math.max(0.5, s.d - 0.5)) + 0.36);
+            ctx.beginPath();
+            ctx.rect(-10, -10, 120, 90);
+            ctx.moveTo(E.x - coverWidth, E.y - 0.95);
+            ctx.lineTo(E.x + coverWidth, E.y - 0.95);
+            ctx.lineTo(E.x + coverWidth, SCENE_H + 8);
+            ctx.lineTo(E.x - coverWidth, SCENE_H + 8);
+            ctx.closePath();
+            ctx.clip('evenodd');
+        }
+        drawBodyAttachedBorders();
+        // Fold and rim contours remain independently animated in the foreground.
         drawEntranceOverlay();
         ctx.restore();
 
