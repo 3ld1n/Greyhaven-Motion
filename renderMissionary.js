@@ -1212,12 +1212,14 @@ export function createMissionaryRenderer(canvas) {
 
         }
 
-        // Static contour replacement. Draw after the entry skin cover, but
-        // clip out the moving object's footprint: the contour cannot overlay it.
+        // Static contour replacement. The shaft-corridor exclusion belongs ONLY
+        // to the original body-attached borders.  Do not let it clip the later
+        // Y/fold strokes: they need to remain visible above the moving layer.
         ctx.save();
         ctx.translate(pelvisSway, pelvisBounce);
+        ctx.save(); // scoped contour-only exclusion
         {
-            // Never let the fixed contour lines paint over the shaft corridor.
+            // Keep existing old-border/shaft overlap prevention unchanged.
             const coverWidth = spine.length
                 ? Math.max(1.7, ...spine.slice(0, Math.min(8, spine.length)).map(pt => Math.abs(pt.pos.x - E.x) + pt.r + 0.14))
                 : 1.7;
@@ -1233,11 +1235,14 @@ export function createMissionaryRenderer(canvas) {
         // INSPECT body-contours BEGIN
         inspectPaint('body-contours', () => { drawBodyAttachedBorders(); });
         // INSPECT body-contours END
-        // Fold and rim contours remain independently animated in the foreground.
+        ctx.restore(); // end contour-only exclusion, retaining pelvis transform
+
+        // Draw the approved Y/fold foreground OUTSIDE the rectangular exclusion.
+        // Inspector retains its independent y-fold-outlines toggle/picking.
         // INSPECT y-fold-outlines BEGIN
         inspectPaint('y-fold-outlines', () => { drawEntranceOverlay(); });
         // INSPECT y-fold-outlines END
-        ctx.restore();
+        ctx.restore(); // end pelvis transform
 
         // ==================== clean entrance canvas area ====================
         // Deliberately no fold, rim, depth opening, or added skin mask here.

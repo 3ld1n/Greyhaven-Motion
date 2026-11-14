@@ -1,3 +1,17 @@
+# v0.1.35.6 — Foreground Y/fold visibility: contour-only clipping
+
+Built strictly from the v0.1.35.5 Drawing Inspector ZIP.  Separates the existing
+`ctx.clip('evenodd')` exclusion from the Y/fold foreground painting: the clip
+still applies to `body-contours`, while `y-fold-outlines` now draws after its
+`ctx.restore()` in the same pelvis coordinates.  No geometry, skin colors,
+shaft clipping, tip, depth, physics, events, or Inspector controls are changed.
+
+This does NOT remove the clipping for the moving shaft, nor does it promise all
+rectangular artifacts are removed. Use the preserved Inspect tab to compare
+which foreground strokes are now visible at the same movement states.
+
+---
+
 # v0.1.35.5 — Temporary Drawing Inspector (v0.1.35 baseline)
 
 This build restores the **original rounded shaft tip** from v0.1.35 (including
