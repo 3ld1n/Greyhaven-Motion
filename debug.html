@@ -1,0 +1,12 @@
+<!doctype html><html><head><style>html,body{margin:0;background:#ddd;} canvas{width:1000px;height:640px;display:block;}</style></head><body><canvas id="canvas" width="1000" height="640"></canvas><script type="module">
+import {createSim, CENTERLINES} from './sim.js';
+import {createMissionaryRenderer} from './renderMissionary.js';
+import {herTone,himTone} from './skins.js';
+const c=document.getElementById('canvas');
+const sim=createSim({centerline:CENTERLINES.pov,protection:false,penisInches:8,maxDepthPct:100,canalLength:1,tightness:1});
+const r=createMissionaryRenderer(c);r.setSkin(herTone('light'),himTone('tan'));
+window.ready=true;window.onerror=(...args)=>window.errorInfo=(window.errorInfo||[]).concat([String(args[0])]);
+window.setView=(xray,depth)=>{r.setXray(xray);sim.setTarget(depth*sim.state.MAX_NORMAL);for(let i=0;i<300;i++){sim.update(1/120);r.render(sim)}return {d:sim.state.d,inside:sim.state.inside,spine:sim.state.spine.slice(0,5)};};
+window.getState=()=>sim.state;
+window.setView(false,0);
+</script></body></html>

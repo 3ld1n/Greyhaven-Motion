@@ -296,12 +296,8 @@ export function createMissionaryRenderer(canvas) {
         const entranceTarget = Math.max(activeEntrance, lingerEntrance);
         disp.entranceOpen = ease(disp.entranceOpen, entranceTarget, activeEntrance > disp.entranceOpen ? 14 : 7.0);
         const lipsOpen = Math.max(0, Math.min(1, disp.entranceOpen));
-        // Ensure the visible-shaft clip spans its full width and follows a
-        // rounded contact arc; the old narrow, shallow arc cut it almost
-        // horizontally, giving the exposed section a box-shaped top.
-        const entryShaftRadius = s.shaftRadius(Math.max(0, s.d));
-        const edgeW = Math.max(3.20, entryShaftRadius + 0.25, 1.75 + lipsOpen * 2.75);
-        const edgeH = 1.25 + lipsOpen * 1.00;
+        const edgeW = 1.75 + lipsOpen * 2.75;
+        const edgeH = 0.28 + lipsOpen * 0.92;
         const edgeY = E.y + 2.05;
         const edgePoints = [];
         for (let i = 0; i <= 36; i++) {
@@ -859,6 +855,22 @@ export function createMissionaryRenderer(canvas) {
         drawEntranceDepthUnder();
         ctx.restore();
 
+        // Reuse the original body-skin patch BEFORE the moving layer. It
+        // preserves the torso color without painting a rectangle over the shaft
+        // or the depth artwork. The independent moving-layer clip controls
+        // visibility at the actual entry edge.
+        if (!showXray) {
+            ctx.save();
+            ctx.translate(pelvisSway, pelvisBounce);
+            torsoPath(belly);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 1.4 - winShift, 13.4, 16.8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
+            ctx.restore();
+        }
+
         // ==================== shaft layer (no jiggle) ====================
         // Puddle on the sheet below (grows with everything that has leaked out)
         if (puddle > 0.02) {
@@ -898,21 +910,6 @@ export function createMissionaryRenderer(canvas) {
             }
             ctx.beginPath();
             smoothPath(ctx, topEdge);
-            // Round the existing shaft's far end rather than leaving the
-            // old straight horizontal closing edge. Do not extend shaft length
-            // through the scene or change the simulation's spine samples.
-            const tailTop = topEdge[topEdge.length - 1];
-            const tailBot = botEdge[botEdge.length - 1];
-            const tailPrev = spine[Math.max(0, spine.length - 2)].pos;
-            const tailLast = spine[spine.length - 1].pos;
-            const tailDir = { x: tailLast.x - tailPrev.x, y: tailLast.y - tailPrev.y };
-            const tailLen = Math.hypot(tailDir.x, tailDir.y) || 1;
-            const roundDistance = Math.min(1.0, spine[spine.length - 1].r * 0.28);
-            ctx.quadraticCurveTo(
-                (tailTop.x + tailBot.x) / 2 + tailDir.x / tailLen * roundDistance * 2,
-                (tailTop.y + tailBot.y) / 2 + tailDir.y / tailLen * roundDistance * 2,
-                tailBot.x, tailBot.y
-            );
             smoothPath(ctx, [...botEdge].reverse(), true);
             ctx.closePath();
             ctx.fillStyle = PAL.shaft;
@@ -921,30 +918,10 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.7;
             ctx.stroke();
 
+            // Keep the tip sampling for protection geometry, but delete
+            // the redundant opaque tip polygon and its brown outline.
+            // Only the main shaft geometry is drawn.
             const gTop = topEdge.filter((_, i) => spine[i].u <= 4.0);
-            const gBot = botEdge.filter((_, i) => spine[i].u <= 4.0);
-            if (gTop.length > 1 && (showXray || !s.inside)) {
-                ctx.beginPath();
-                smoothPath(ctx, gTop);
-                smoothPath(ctx, [...gBot].reverse(), true);
-                ctx.closePath();
-                // A second solid, closed tip polygon with an outlined, flat
-                // rear edge looked like an independent rectangle on the shaft.
-                // Keep the tip tint, but blend it into the already rounded
-                // shaft silhouette, without a second boxed outline.
-                const tipColor = ctx.createLinearGradient(
-                    spine[0].pos.x, spine[0].pos.y,
-                    spine[Math.min(5, spine.length - 1)].pos.x,
-                    spine[Math.min(5, spine.length - 1)].pos.y
-                );
-                if (tipColor && typeof tipColor.addColorStop === 'function') {
-                    tipColor.addColorStop(0, PAL.glans);
-                    tipColor.addColorStop(0.66, PAL.shaft);
-                    tipColor.addColorStop(1, PAL.shaft);
-                }
-                ctx.fillStyle = tipColor || PAL.shaft;
-                ctx.fill();
-            }
 
             ctx.beginPath();
             smoothPath(ctx, topEdge.map(p => ({ x: p.x - 0.45, y: p.y + 0.1 })));
@@ -1031,10 +1008,8 @@ export function createMissionaryRenderer(canvas) {
             ctx.translate(pelvisSway, pelvisBounce);
             torsoPath(belly);
             ctx.clip();
-            ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 1.4 - winShift, 13.4, 16.8, 0, 0, Math.PI * 2);
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
+            // No duplicate opaque torso skin fill here: it was drawn
+            // beneath the moving layer so it cannot obscure the shaft.
             ctx.beginPath();
             ctx.ellipse(WIN.x, WIN.y + 10.8 - winShift, 8.1 + Math.min(1, bellyWave) * 0.9, 3.15 + motionVel * 0.55, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(178, 90, 114, 0.10)';

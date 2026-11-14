@@ -1,3 +1,14 @@
+# v0.1.35.4 — Remove duplicate tip and body-overdraw layers
+
+Built directly on the user's original **v0.1.35** (not v0.1.35.3).
+
+- Deleted the *second* opaque tip polygon and its independent outline. The main moving shaft is still drawn exactly as in v0.1.35.
+- Moved the existing opaque torso skin patch under the moving geometry instead of painting it over the shaft. The same torso shading is retained; the actual moving-layer clip still controls occlusion at the entrance.
+- Preserved `drawEntranceDepthUnder()` and its call, and the rest of the v0.1.35 artwork, thigh geometry, Y shape, folds, simulation and controls.
+- This removes redundant overpainting but **does not remove the main shaft**. Its silhouette and visible length are intentional; it can still look rectangular when viewed at a shallow angle or short exposed length.
+
+---
+
 # v0.1.35 — Torso bottom shadow and opaque Y-line micro-fix
 
 This update intentionally changes only two rendering details.
@@ -292,11 +303,3 @@ Missionary-only MVP for SillyTavern.
 - **Y detail realigned:** its two arms join the same upper point as the stem rather than forming a lower, detached V.
 - **Upper opening made more visible:** filled rounded upper oval, larger curved rim and separate small central peak.
 - **Real-time input and old physics preserved.** The standalone rendering checks sampled initial closed, shallow, medium, deep, withdrawn, and X-ray states. These checks do not guarantee the appearance on every phone; visually inspect before treating as a final design.
-
-
-### 0.1.35.3: Rounded exposed-shaft edge
-- Based on original v0.1.35; `drawEntranceDepthUnder()` and its call restored unchanged.
-- Exposed-shaft entrance clipping uses a rounded curve covering the complete width rather than a shallow almost-flat cut.
-- Far shaft terminus uses a rounded closure at its existing location (no infinite-length extension).
-- Tip tint blends into the shaft rather than painting a second boxed polygon with a horizontal outline.
-- All thigh and torso paths, fold covers, X-ray internals, and simulation unchanged.
