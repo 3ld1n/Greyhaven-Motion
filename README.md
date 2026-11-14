@@ -242,3 +242,10 @@ Missionary-only MVP for SillyTavern.
 - Pre-ejaculate event is scheduled when protection is off and scene reset; if it happens, track whether a depth threshold was reached later.
 - Compact status strip indicates protection and fluid event states. Summary appends concise chronological events.
 - This release does not draw graphic anatomical fluid effects, and does not modify the established physics or renderMissionary.js.
+
+## v0.1.30
+- rebuilt the external entrance artwork from the user sketch set instead of reusing the removed fold block
+- added fixed thigh-border cover lines that mask the older V outline locally without moving the whole body
+- added a separate depth opening under-layer plus separate rim/fold over-layers so the shaft can still disappear at depth
+- lip/fold motion now morphs locally from closed -> slightly open -> active open using real-time depth/contact instead of one bouncing block
+- mirrored the new entrance look in both non-X-ray and X-ray modes while preserving the approved body and shaft occlusion logic

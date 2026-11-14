@@ -48,6 +48,10 @@ function smoothPath(ctx, points, cont = false) {
     ctx.lineTo(last.x, last.y);
 }
 
+function mix(a, b, t) {
+    return a + (b - a) * t;
+}
+
 export function createMissionaryRenderer(canvas) {
     let showXray = true;
     let protection = false;
@@ -63,7 +67,7 @@ export function createMissionaryRenderer(canvas) {
     const responseDrops = []; // short-lived decorative spray, separate from release fluid
     let responseSpawnAcc = 0;
     let leakAcc = 0, puddle = 0;
-    const disp = { contact: 0, pelvisX: 0, pelvisY: 0, thighL: 0, thighR: 0, open: 0 };
+    const disp = { contact: 0, pelvisX: 0, pelvisY: 0, thighL: 0, thighR: 0, open: 0, entranceOpen: 0 };
 
     function resize() {
         const dpr = window.devicePixelRatio || 1;
@@ -275,22 +279,143 @@ export function createMissionaryRenderer(canvas) {
         disp.open = ease(disp.open, targetOpeningSpread, 11);
         const openingSpread = disp.open;
 
-        // One shared edge for the non-X-ray cover, the moving-layer clip and the final outline.
-        // All three must use the same points or subpixel seams will keep reappearing.
+        // Local entrance morph: driven in real time by depth/contact, but it also
+        // retains a little openness after repeated strokes instead of snapping back
+        // to the fully closed pose immediately.
         const occlusionOpen = Math.max(0, Math.min(1, motionContact * 1.15));
-        const hasMadeContact = (s.maxReach || 0) > 0.06 || s.inside || occlusionOpen > 0.05;
-        const edgeW = 2.10 + openingSpread * 2.05;
-        const edgeH = 0.92 + openingSpread * 0.96;
-        const edgeY = E.y + 2.00;
+        const depthNorm = Math.max(0, Math.min(1, s.depthNorm || 0));
+        const reachNorm = Math.max(0, Math.min(1.5, (s.maxReach || 0) / Math.max(1, s.MAX_NORMAL || 1)));
+        const activeEntrance = Math.max(0, Math.min(1,
+            (s.inside ? 0.24 : 0) + depthNorm * 1.18 + motionVel * 0.22 + Math.abs(s.dVel || 0) * 0.0045
+        ));
+        const lingerEntrance = Math.max(0, Math.min(0.34, reachNorm * 0.22));
+        const entranceTarget = Math.max(activeEntrance, lingerEntrance);
+        disp.entranceOpen = ease(disp.entranceOpen, entranceTarget, activeEntrance > disp.entranceOpen ? 14 : 6.5);
+        const lipsOpen = Math.max(0, Math.min(1, disp.entranceOpen));
+        const hasMadeContact = (s.maxReach || 0) > 0.06 || s.inside || occlusionOpen > 0.05 || lipsOpen > 0.03;
+        const edgeW = 1.75 + lipsOpen * 2.75;
+        const edgeH = 0.28 + lipsOpen * 0.92;
+        const edgeY = E.y + 2.05;
         const edgePoints = [];
         for (let i = 0; i <= 36; i++) {
             const t = -1 + 2 * i / 36;
             edgePoints.push({ x: E.x + edgeW * t, y: edgeY - edgeH * Math.sqrt(Math.max(0, 1 - t * t)) });
         }
-        // ENTRANCE CLEANUP (v0.1.29): edgePoints are preserved ONLY for the
-        // invisible-shaft clip and opaque skin cover. The old rim, bridge,
-        // oval side occluders and fold drawing helpers have been removed.
-        // Future entrance visuals will live in a new isolated renderer.
+
+        const lineFade = Math.max(0, Math.min(1, 1 - lipsOpen * 2.0));
+        const rimReveal = Math.max(0, Math.min(1, (lipsOpen - 0.04) / 0.36));
+
+        function drawEntranceDepthUnder() {
+            const triTopY = E.y + 0.95;
+            const triBaseY = E.y + 3.25;
+            const triHalfW = mix(0.85, 1.55, lipsOpen);
+            ctx.beginPath();
+            ctx.moveTo(E.x - triHalfW, triBaseY);
+            ctx.quadraticCurveTo(E.x - triHalfW * 0.34, E.y + 2.15, E.x, triTopY);
+            ctx.quadraticCurveTo(E.x + triHalfW * 0.34, E.y + 2.15, E.x + triHalfW, triBaseY);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255,255,255,${0.10 + lipsOpen * 0.10})`;
+            ctx.fill();
+
+            if (rimReveal > 0.02) {
+                ctx.beginPath();
+                ctx.moveTo(E.x - (1.05 + rimReveal * 0.85), E.y + 1.55);
+                ctx.quadraticCurveTo(E.x, E.y + 1.00, E.x + (1.05 + rimReveal * 0.85), E.y + 1.55);
+                ctx.quadraticCurveTo(E.x + 0.68 + rimReveal * 0.35, E.y + 2.58, E.x, E.y + 4.45);
+                ctx.quadraticCurveTo(E.x - 0.68 - rimReveal * 0.35, E.y + 2.58, E.x - (1.05 + rimReveal * 0.85), E.y + 1.55);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(137,66,90,${0.12 + rimReveal * 0.12})`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.ellipse(E.x, E.y + 1.80, 0.68 + rimReveal * 1.35, 0.18 + rimReveal * 0.45, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(67,24,40,${0.16 + rimReveal * 0.26})`;
+                ctx.fill();
+            }
+        }
+
+        function drawEntranceOverlay() {
+            // New thigh-border covers: fixed to the body. A wide skin stroke first
+            // hides the older underlying outline, then the visible border is redrawn.
+            for (const sign of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(E.x + sign * 1.15, E.y + 3.78);
+                ctx.quadraticCurveTo(E.x + sign * 3.10, E.y + 0.90, E.x + sign * 5.30, E.y - 1.80);
+                ctx.quadraticCurveTo(E.x + sign * 6.85, E.y - 3.80, E.x + sign * 8.25, E.y - 5.45);
+                ctx.strokeStyle = PAL.skin;
+                ctx.lineWidth = 3.4;
+                ctx.stroke();
+                ctx.strokeStyle = PAL.skinLine;
+                ctx.lineWidth = 0.82;
+                ctx.stroke();
+            }
+
+            // Closed-state center line + slight Y tip. It fades away as soon as the
+            // lips are actively opening.
+            if (lineFade > 0.02) {
+                ctx.beginPath();
+                ctx.moveTo(E.x, E.y - 3.55);
+                ctx.lineTo(E.x, E.y + 1.18);
+                ctx.strokeStyle = `rgba(178,90,114,${0.55 * lineFade})`;
+                ctx.lineWidth = 0.62;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(E.x - 0.56 * lineFade, E.y - 3.28);
+                ctx.lineTo(E.x, E.y - 2.68);
+                ctx.lineTo(E.x + 0.56 * lineFade, E.y - 3.28);
+                ctx.strokeStyle = `rgba(178,90,114,${0.58 * lineFade})`;
+                ctx.lineWidth = 0.56;
+                ctx.stroke();
+            }
+
+            if (rimReveal > 0.02) {
+                // Rim / top opening shape.
+                ctx.beginPath();
+                ctx.moveTo(E.x - (1.55 + rimReveal * 0.95), E.y + 1.38);
+                ctx.quadraticCurveTo(E.x - 0.78, E.y + 0.80, E.x, E.y + 0.48);
+                ctx.quadraticCurveTo(E.x + 0.78, E.y + 0.80, E.x + (1.55 + rimReveal * 0.95), E.y + 1.38);
+                ctx.quadraticCurveTo(E.x + 0.70, E.y + 1.92, E.x, E.y + 2.05);
+                ctx.quadraticCurveTo(E.x - 0.70, E.y + 1.92, E.x - (1.55 + rimReveal * 0.95), E.y + 1.38);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(189, 120, 150, ${0.40 + rimReveal * 0.20})`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(142,47,82,${0.32 + rimReveal * 0.18})`;
+                ctx.lineWidth = 0.40;
+                ctx.stroke();
+            }
+
+            // Thin inner creases, kept separate from the outer fold strokes.
+            if (lipsOpen > 0.10) {
+                for (const sign of [-1, 1]) {
+                    ctx.beginPath();
+                    ctx.moveTo(E.x + sign * (0.88 + rimReveal * 0.18), E.y + 1.35);
+                    ctx.quadraticCurveTo(E.x + sign * (1.05 + lipsOpen * 0.65), E.y - 0.05, E.x + sign * (1.55 + lipsOpen * 0.95), E.y - 2.35 - lipsOpen * 0.55);
+                    ctx.strokeStyle = `rgba(207, 167, 179, ${0.55})`;
+                    ctx.lineWidth = 0.34;
+                    ctx.stroke();
+                }
+            }
+
+            // Main folds: local morph only. They do not scale the whole entrance block.
+            for (const sign of [-1, 1]) {
+                const startX = E.x + sign * (1.48 + rimReveal * 0.18);
+                const startY = E.y + 1.55;
+                const endX = E.x + sign * mix(2.55, 8.05, lipsOpen);
+                const endY = mix(E.y - 3.65, E.y - 5.55, lipsOpen);
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.bezierCurveTo(
+                    E.x + sign * mix(1.95, 2.70, lipsOpen), E.y + 0.65,
+                    E.x + sign * mix(4.20, 5.95, lipsOpen), E.y - 2.60 - lipsOpen * 0.30,
+                    endX, endY
+                );
+                ctx.strokeStyle = PAL.skinLine;
+                ctx.lineWidth = 1.28;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
 
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
@@ -650,6 +775,12 @@ export function createMissionaryRenderer(canvas) {
         }
         ctx.restore(); // end body/jiggle layer
 
+        // Local entrance depth opening sits beneath the shaft in both views.
+        ctx.save();
+        ctx.translate(pelvisSway, pelvisBounce);
+        drawEntranceDepthUnder();
+        ctx.restore();
+
         // ==================== shaft layer (no jiggle) ====================
         // Puddle on the sheet below (grows with everything that has leaked out)
         if (puddle > 0.02) {
@@ -938,6 +1069,12 @@ export function createMissionaryRenderer(canvas) {
         // The X-ray oval, interior canal, and simulator remain unchanged.
 
         }
+
+        // Final external entrance artwork: fixed thigh-border covers + folds/rim over the shaft.
+        ctx.save();
+        ctx.translate(pelvisSway, pelvisBounce);
+        drawEntranceOverlay();
+        ctx.restore();
 
         // ==================== clean entrance canvas area ====================
         // Deliberately no fold, rim, depth opening, or added skin mask here.
