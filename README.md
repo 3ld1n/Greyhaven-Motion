@@ -1,3 +1,12 @@
+# v0.1.36 — Floating base-cap rectangle fix
+
+- Identified the recurring tan/brown floating rectangle as the closed **base of the shaft mesh** when its finite tip-to-base polygon moved entirely inside the scene at deep insertion. It was not the torso X-ray skin cover or rim.
+- The *drawn silhouette* now extends below the visible frame when the physical shaft base comes into view, hiding the unnatural flat cap without altering stroke physics, shaft tip, body/thigh artwork, rim, Y-shaped folds, or depth occlusion.
+- The protective film outline uses the same visual continuation so it does not leave a separate base seam.
+- Other extension files and simulation logic are unchanged.
+
+---
+
 # v0.1.35 — Torso bottom shadow and opaque Y-line micro-fix
 
 This update intentionally changes only two rendering details.

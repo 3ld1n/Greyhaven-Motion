@@ -892,9 +892,31 @@ export function createMissionaryRenderer(canvas) {
                 topEdge.push({ x: spine[i].pos.x - ty * r, y: spine[i].pos.y + tx * r });
                 botEdge.push({ x: spine[i].pos.x + ty * r, y: spine[i].pos.y - tx * r });
             }
+            // The actual shaft mesh has a finite base. At deeper insertions its
+            // closed polygon end could enter the viewport, producing the floating
+            // skin-colored "rectangle" with a dark bottom border. Do not change
+            // the simulator/shaft length: continue ONLY the drawn silhouette
+            // beyond the bottom of the canvas so its base cap is never visible.
+            // Keep the original arrays for tip, protection and effect calculations.
+            const shaftTopDraw = topEdge.slice();
+            const shaftBotDraw = botEdge.slice();
+            const tail = spine[spine.length - 1].pos;
+            const beforeTail = spine[spine.length - 2].pos;
+            const outwardY = tail.y - beforeTail.y;
+            if (outwardY > 0.01 && tail.y < SCENE_H + 8) {
+                const tailTravel = (SCENE_H + 12 - tail.y) / outwardY;
+                const endX = tail.x + (tail.x - beforeTail.x) * tailTravel;
+                const endY = SCENE_H + 12;
+                const a = beforeTail, b = tail;
+                const tx = (b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+                const ty = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+                const tailRadius = spine[spine.length - 1].r;
+                shaftTopDraw.push({ x: endX - ty * tailRadius, y: endY + tx * tailRadius });
+                shaftBotDraw.push({ x: endX + ty * tailRadius, y: endY - tx * tailRadius });
+            }
             ctx.beginPath();
-            smoothPath(ctx, topEdge);
-            smoothPath(ctx, [...botEdge].reverse(), true);
+            smoothPath(ctx, shaftTopDraw);
+            smoothPath(ctx, [...shaftBotDraw].reverse(), true);
             ctx.closePath();
             ctx.fillStyle = PAL.shaft;
             ctx.fill();
@@ -925,8 +947,8 @@ export function createMissionaryRenderer(canvas) {
             if (protection) {
                 const tear = protectionTearGeometry(spine, now);
                 ctx.beginPath();
-                smoothPath(ctx, topEdge);
-                smoothPath(ctx, [...botEdge].reverse(), true);
+                smoothPath(ctx, shaftTopDraw);
+                smoothPath(ctx, [...shaftBotDraw].reverse(), true);
                 ctx.closePath();
                 if (tear) traceProtectionCutout(tear);
                 ctx.fillStyle = 'rgba(120, 190, 255, 0.18)';
@@ -939,8 +961,8 @@ export function createMissionaryRenderer(canvas) {
                     smoothPath(ctx, topEdge.slice(3));
                     smoothPath(ctx, botEdge.slice(3));
                 } else {
-                    smoothPath(ctx, topEdge);
-                    smoothPath(ctx, [...botEdge].reverse(), true);
+                    smoothPath(ctx, shaftTopDraw);
+                    smoothPath(ctx, [...shaftBotDraw].reverse(), true);
                     ctx.closePath();
                 }
                 ctx.strokeStyle = 'rgba(120, 190, 255, 0.45)';
