@@ -279,20 +279,23 @@ export function createMissionaryRenderer(canvas) {
         disp.open = ease(disp.open, targetOpeningSpread, 11);
         const openingSpread = disp.open;
 
-        // Local entrance morph: driven in real time by depth/contact, but it also
-        // retains a little openness after repeated strokes instead of snapping back
-        // to the fully closed pose immediately.
+        // Local entrance morph: stay fully contracted until the shaft actually
+        // reaches the folds, then open in real time. After enough work, leave
+        // a small lingering openness based on looseness instead of snapping shut.
         const occlusionOpen = Math.max(0, Math.min(1, motionContact * 1.15));
         const depthNorm = Math.max(0, Math.min(1, s.depthNorm || 0));
         const reachNorm = Math.max(0, Math.min(1.5, (s.maxReach || 0) / Math.max(1, s.MAX_NORMAL || 1)));
-        const activeEntrance = Math.max(0, Math.min(1,
-            (s.inside ? 0.24 : 0) + depthNorm * 1.18 + motionVel * 0.22 + Math.abs(s.dVel || 0) * 0.0045
-        ));
-        const lingerEntrance = Math.max(0, Math.min(0.34, reachNorm * 0.22));
+        const contactThreshold = (s.maxReach || 0) > 0.08 || s.inside || depthNorm > 0.008;
+        const hasMadeContact = contactThreshold;
+        const activeEntrance = hasMadeContact ? Math.max(0, Math.min(1,
+            0.08 + (s.inside ? 0.16 : 0) + depthNorm * 1.05 + motionVel * 0.18 + Math.abs(s.dVel || 0) * 0.0036
+        )) : 0;
+        const lingerEntrance = hasMadeContact ? Math.max(0, Math.min(0.22,
+            (s.loose || 0) * 0.18 + reachNorm * 0.05
+        )) : 0;
         const entranceTarget = Math.max(activeEntrance, lingerEntrance);
-        disp.entranceOpen = ease(disp.entranceOpen, entranceTarget, activeEntrance > disp.entranceOpen ? 14 : 6.5);
+        disp.entranceOpen = ease(disp.entranceOpen, entranceTarget, activeEntrance > disp.entranceOpen ? 14 : 7.0);
         const lipsOpen = Math.max(0, Math.min(1, disp.entranceOpen));
-        const hasMadeContact = (s.maxReach || 0) > 0.06 || s.inside || occlusionOpen > 0.05 || lipsOpen > 0.03;
         const edgeW = 1.75 + lipsOpen * 2.75;
         const edgeH = 0.28 + lipsOpen * 0.92;
         const edgeY = E.y + 2.05;
@@ -307,56 +310,56 @@ export function createMissionaryRenderer(canvas) {
 
         function drawEntranceDepthUnder() {
             // Underlying opening anatomy. This sits beneath the fold covers and
-            // the shaft. No pale transparent triangle or rectangular skin block.
+            // the shaft. Keep the reveal connected under the rim, but avoid the
+            // old transparent rectangle/triangle look.
             const reveal = hasMadeContact ? rimReveal : 0;
             if (reveal <= 0.01) return;
 
-            const ovalHalf = 0.42 + reveal * 1.15;
-            const ovalCy = E.y - 1.05;
-            const ovalRy = 0.62 + reveal * 1.28;
-            const rimHalf = 0.82 + reveal * 1.18;
-            const rimY = E.y + 0.72;
-            const slotHalf = 0.38 + reveal * 0.90;
-            const slotY = E.y + 1.20;
-            const depthHalf = 0.48 + reveal * 0.82;
-            const depthBottomY = E.y + 3.92;
+            const ovalHalf = 0.40 + reveal * 1.10;
+            const ovalCy = E.y - 1.02;
+            const ovalRy = 0.60 + reveal * 1.22;
+            const rimHalf = 0.78 + reveal * 1.08;
+            const rimY = E.y + 0.68;
+            const slotHalf = 0.34 + reveal * 0.74;
+            const slotY = E.y + 1.08;
+            const depthHalf = 0.34 + reveal * 0.44;
+            const depthBottomY = E.y + 2.65;
 
-            // Rounded top and curved sides remain the target for the
-            // revealed opening silhouette beneath the fold covers.
             // Revealed upper oval opening.
             ctx.beginPath();
             ctx.ellipse(E.x, ovalCy, ovalHalf, ovalRy, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(226,188,197,${0.18 + reveal * 0.16})`;
+            ctx.fillStyle = `rgba(226,188,197,${0.16 + reveal * 0.14})`;
             ctx.fill();
 
             // Opaque rim directly above the depth opening.
             ctx.beginPath();
             ctx.moveTo(E.x - rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.35, E.y + 0.02, E.x, E.y - 0.26);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.35, E.y + 0.02, E.x + rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.52, E.y + 1.05, E.x, E.y + 1.34);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.52, E.y + 1.05, E.x - rimHalf, rimY);
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.00, E.x, E.y - 0.22);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.00, E.x + rimHalf, rimY);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.46, E.y + 0.94, E.x, E.y + 1.18);
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.46, E.y + 0.94, E.x - rimHalf, rimY);
             ctx.closePath();
-            ctx.fillStyle = `rgba(145, 89, 110, ${0.36 + reveal * 0.24})`;
+            ctx.fillStyle = `rgba(145, 89, 110, ${0.44 + reveal * 0.22})`;
             ctx.fill();
 
             // Slot/dark opening connected immediately under the rim.
             ctx.beginPath();
-            ctx.ellipse(E.x, slotY, slotHalf, 0.17 + reveal * 0.24, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(84, 34, 50, ${0.26 + reveal * 0.26})`;
+            ctx.ellipse(E.x, slotY, slotHalf, 0.16 + reveal * 0.18, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
             ctx.fill();
 
-            // Connected depth opening tucked under the folds.
+            // Narrow connected depth pocket under the rim; no upside-down
+            // transparent triangle and no rectangular skin block.
             ctx.beginPath();
-            ctx.moveTo(E.x - depthHalf, slotY + 0.10);
-            ctx.bezierCurveTo(E.x - depthHalf * 0.72, E.y + 2.12,
-                E.x - depthHalf * 0.36, E.y + 3.08,
+            ctx.moveTo(E.x - depthHalf, slotY + 0.02);
+            ctx.bezierCurveTo(E.x - depthHalf * 0.72, E.y + 1.62,
+                E.x - depthHalf * 0.30, E.y + 2.18,
                 E.x, depthBottomY);
-            ctx.bezierCurveTo(E.x + depthHalf * 0.36, E.y + 3.08,
-                E.x + depthHalf * 0.72, E.y + 2.12,
-                E.x + depthHalf, slotY + 0.10);
+            ctx.bezierCurveTo(E.x + depthHalf * 0.30, E.y + 2.18,
+                E.x + depthHalf * 0.72, E.y + 1.62,
+                E.x + depthHalf, slotY + 0.02);
             ctx.closePath();
-            ctx.fillStyle = `rgba(125, 70, 82, ${0.14 + reveal * 0.16})`;
+            ctx.fillStyle = `rgba(107, 60, 74, ${0.10 + reveal * 0.10})`;
             ctx.fill();
         }
 
@@ -369,60 +372,59 @@ export function createMissionaryRenderer(canvas) {
             for (const side of [-1, 1]) {
                 const X = offset => E.x + side * offset;
                 ctx.beginPath();
-                ctx.moveTo(X(2.04), E.y + 4.48);
-                ctx.bezierCurveTo(X(2.02), E.y + 2.42,
-                    X(3.02), E.y + 0.36,
-                    X(4.42), E.y - 2.18);
-                ctx.bezierCurveTo(X(5.18), E.y - 3.54,
-                    X(6.20), E.y - 4.66,
-                    X(7.06), E.y - 5.20);
+                ctx.moveTo(X(2.02), E.y + 4.42);
+                ctx.bezierCurveTo(X(2.00), E.y + 2.34,
+                    X(2.82), E.y + 0.40,
+                    X(4.08), E.y - 1.88);
+                ctx.bezierCurveTo(X(4.88), E.y - 3.18,
+                    X(5.92), E.y - 4.36,
+                    X(7.02), E.y - 5.10);
                 ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.78;
+                ctx.lineWidth = 0.74;
                 ctx.stroke();
             }
             ctx.restore();
         }
 
         function drawEntranceSkinCovers() {
-            // Two body-connected fold covers that open apart on contact,
-            // revealing the real oval/rim underneath rather than fading.
+            // Two narrow body-connected fold covers that stay closed at rest,
+            // then part open on contact. No rectangular skin mask.
             const reveal = hasMadeContact ? rimReveal : 0;
-            const coverGap = 0.16 + reveal * 1.70;
-            const sideSweep = 1.85 + reveal * 0.58;
-            const shoulderY = E.y - 3.90;
-            const lowerY = E.y + 1.26;
+            const shoulderY = E.y - 3.86;
+            const baseY = E.y + 1.12;
+            const innerGap = 0.05 + reveal * 1.10;
+            const innerMid = 0.34 + reveal * 0.34;
+            const outerMid = 0.74 + reveal * 0.74;
+            const outerBase = 1.16 + reveal * 0.94;
+            const shoulderWidth = 0.64 + reveal * 0.24;
             for (const side of [-1, 1]) {
                 ctx.beginPath();
-                ctx.moveTo(E.x + side * 0.03, shoulderY + 0.08);
-                ctx.quadraticCurveTo(E.x + side * 0.28, E.y - 1.66,
-                    E.x + side * (0.64 + reveal * 0.20), E.y - 0.06);
-                ctx.quadraticCurveTo(E.x + side * (0.92 + reveal * 0.84), E.y + 0.94,
-                    E.x + side * coverGap, lowerY);
-                ctx.lineTo(E.x + side * (sideSweep + 0.56), E.y + 1.44);
-                ctx.quadraticCurveTo(E.x + side * (2.20 + reveal * 0.38), E.y - 0.08,
-                    E.x + side * (2.00 + reveal * 0.10), shoulderY + 0.58);
-                ctx.quadraticCurveTo(E.x + side * (1.18 + reveal * 0.16), shoulderY - 0.12,
-                    E.x + side * 0.03, shoulderY + 0.08);
+                ctx.moveTo(E.x + side * 0.03, shoulderY + 0.04);
+                ctx.quadraticCurveTo(E.x + side * 0.14, E.y - 2.12,
+                    E.x + side * innerMid, E.y - 0.76);
+                ctx.quadraticCurveTo(E.x + side * outerMid, E.y + 0.08,
+                    E.x + side * innerGap, baseY);
+                ctx.quadraticCurveTo(E.x + side * outerBase, E.y + 0.98,
+                    E.x + side * (shoulderWidth + outerMid * 0.32), shoulderY + 0.54);
+                ctx.quadraticCurveTo(E.x + side * shoulderWidth, shoulderY - 0.06,
+                    E.x + side * 0.03, shoulderY + 0.04);
                 ctx.closePath();
                 ctx.fillStyle = PAL.skin;
                 ctx.fill();
-
-                // The opaque edge-aligned cover is now expressed as the two
-                // split, body-connected fold covers above rather than one block.
             }
         }
 
         function drawEntranceOverlay() {
             const reveal = hasMadeContact ? Math.max(0, Math.min(1, (lipsOpen - 0.02) / 0.80)) : 0;
             const yJunction = E.y - 3.94;
-            const stemBottom = E.y + 0.94;
+            const stemBottom = E.y + 0.92;
             const forkHalf = 0.46;
 
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // Central Y always remains the core of the entrance drawing.
+            // Central Y remains the core outline.
             ctx.beginPath();
             ctx.moveTo(E.x, yJunction - 0.02);
             ctx.lineTo(E.x, stemBottom);
@@ -430,26 +432,26 @@ export function createMissionaryRenderer(canvas) {
             ctx.quadraticCurveTo(E.x - 0.14, yJunction - 0.18, E.x, yJunction);
             ctx.moveTo(E.x + forkHalf, yJunction - 0.54);
             ctx.quadraticCurveTo(E.x + 0.14, yJunction - 0.18, E.x, yJunction);
-            ctx.strokeStyle = `rgba(178,90,114,${0.52 - reveal * 0.06})`;
-            ctx.lineWidth = 0.58;
+            ctx.strokeStyle = `rgba(178,90,114,${0.56 - reveal * 0.06})`;
+            ctx.lineWidth = 0.56;
             ctx.stroke();
 
-            // The Y branches extend down and become the visible fold outlines,
-            // precisely following the opening covers. No extra thin helper lines.
+            // The Y branches continue into the fold bottoms and meet the fixed
+            // thigh borders. Keep them thin and slightly curved.
             for (const side of [-1, 1]) {
                 ctx.beginPath();
-                ctx.moveTo(E.x + side * 0.10, yJunction + 0.10);
+                ctx.moveTo(E.x + side * 0.10, yJunction + 0.08);
                 ctx.bezierCurveTo(
-                    E.x + side * (0.34 + reveal * 0.08), E.y - 1.78,
-                    E.x + side * (0.62 + reveal * 0.66), E.y + 0.16,
-                    E.x + side * (1.20 + reveal * 1.16), E.y + 1.34
+                    E.x + side * (0.22 + reveal * 0.12), E.y - 1.92,
+                    E.x + side * (0.48 + reveal * 0.54), E.y - 0.36,
+                    E.x + side * (0.98 + reveal * 0.94), E.y + 0.96
                 );
                 ctx.quadraticCurveTo(
-                    E.x + side * (1.64 + reveal * 0.72), E.y + 1.34,
-                    E.x + side * (2.02 + reveal * 0.40), E.y + 1.12
+                    E.x + side * (1.40 + reveal * 0.62), E.y + 1.12,
+                    E.x + side * (1.92 + reveal * 0.18), E.y + 1.10
                 );
                 ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 1.00;
+                ctx.lineWidth = 0.76;
                 ctx.stroke();
             }
             ctx.restore();
@@ -1122,8 +1124,11 @@ export function createMissionaryRenderer(canvas) {
         // clip out the moving object's footprint: the contour cannot overlay it.
         ctx.save();
         ctx.translate(pelvisSway, pelvisBounce);
-        if (s.inside && s.d > 0) {
-            const coverWidth = Math.max(2.6, s.shaftRadius(Math.max(0.5, s.d - 0.5)) + 0.36);
+        {
+            // Never let the fixed contour lines paint over the shaft corridor.
+            const coverWidth = spine.length
+                ? Math.max(1.7, ...spine.slice(0, Math.min(8, spine.length)).map(pt => Math.abs(pt.pos.x - E.x) + pt.r + 0.14))
+                : 1.7;
             ctx.beginPath();
             ctx.rect(-10, -10, 120, 90);
             ctx.moveTo(E.x - coverWidth, E.y - 0.95);
