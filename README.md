@@ -1,24 +1,3 @@
-# v0.1.37 — Rim contour only (no polygon backdrop)
-
-Focused visual patch based on user feedback:
-- Replace the filled rim polygon with a solid, opaque **curved rim stroke**.
-- Remove the little triangular depth-notch fill that could resemble an extra background block.
-- Do not change the body, thigh outlines, shaft geometry, movement, X-ray logic or settings.
-- The rim line only appears when the entrance reveal state calls for it; no dark filled slot remains.
-
-**Visual note:** a solid shape visible *below* the entrance during deep strokes may be the shaft itself, rather than this rim; this patch does not alter the shaft rendering.
-
----
-
-# v0.1.36 — Floating base-cap rectangle fix
-
-- Identified the recurring tan/brown floating rectangle as the closed **base of the shaft mesh** when its finite tip-to-base polygon moved entirely inside the scene at deep insertion. It was not the torso X-ray skin cover or rim.
-- The *drawn silhouette* now extends below the visible frame when the physical shaft base comes into view, hiding the unnatural flat cap without altering stroke physics, shaft tip, body/thigh artwork, rim, Y-shaped folds, or depth occlusion.
-- The protective film outline uses the same visual continuation so it does not leave a separate base seam.
-- Other extension files and simulation logic are unchanged.
-
----
-
 # v0.1.35 — Torso bottom shadow and opaque Y-line micro-fix
 
 This update intentionally changes only two rendering details.

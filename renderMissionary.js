@@ -320,6 +320,10 @@ export function createMissionaryRenderer(canvas) {
             const ovalRy = 0.60 + reveal * 1.22;
             const rimHalf = 0.78 + reveal * 1.08;
             const rimY = E.y + 0.68;
+            const slotHalf = 0.34 + reveal * 0.74;
+            const slotY = E.y + 1.08;
+            const depthHalf = 0.34 + reveal * 0.44;
+            const depthBottomY = E.y + 2.65;
 
             // Revealed upper oval opening.
             ctx.beginPath();
@@ -327,27 +331,32 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(226,188,197,${0.16 + reveal * 0.14})`;
             ctx.fill();
 
-            // True opaque curved rim contour — no solid polygon, square or
-            // skin-coloured rectangle behind it. Leave the centre transparent
-            // so the existing underlying opening can be seen naturally.
-            // These two arcs share their side endpoints, making a narrow
-            // continuous border rather than a filled trapezoid.
-            ctx.save();
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#a76a7d';
-            ctx.lineWidth = 0.70;
+            // Opaque rim directly above the depth opening.
             ctx.beginPath();
             ctx.moveTo(E.x - rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.02, E.x, E.y - 0.22);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.02, E.x + rimHalf, rimY);
-            ctx.stroke();
-            ctx.restore();
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.00, E.x, E.y - 0.22);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.00, E.x + rimHalf, rimY);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.46, E.y + 0.94, E.x, E.y + 1.18);
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.46, E.y + 0.94, E.x - rimHalf, rimY);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(145, 89, 110, ${0.44 + reveal * 0.22})`;
+            ctx.fill();
 
-            // The previous filled dark slot formed a small floating polygon
-            // directly under the Y, visually reading as a rectangular backdrop.
-            // The rim itself is now the only visible entrance contour. Its
-            // interior is left open: do not draw a filled slot underneath it.
+            // Slot/dark opening connected immediately under the rim.
+            ctx.beginPath();
+            ctx.ellipse(E.x, slotY, slotHalf, 0.16 + reveal * 0.18, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
+            ctx.fill();
+
+            // Keep only a tiny connected depth notch under the slot so the old
+            // pale rectangle/block is gone.
+            ctx.beginPath();
+            ctx.moveTo(E.x - (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.56, E.x + (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.88, E.x - (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(107, 60, 74, ${0.08 + reveal * 0.08})`;
+            ctx.fill();
         }
 
         function drawBodyAttachedBorders() {
@@ -883,31 +892,9 @@ export function createMissionaryRenderer(canvas) {
                 topEdge.push({ x: spine[i].pos.x - ty * r, y: spine[i].pos.y + tx * r });
                 botEdge.push({ x: spine[i].pos.x + ty * r, y: spine[i].pos.y - tx * r });
             }
-            // The actual shaft mesh has a finite base. At deeper insertions its
-            // closed polygon end could enter the viewport, producing the floating
-            // skin-colored "rectangle" with a dark bottom border. Do not change
-            // the simulator/shaft length: continue ONLY the drawn silhouette
-            // beyond the bottom of the canvas so its base cap is never visible.
-            // Keep the original arrays for tip, protection and effect calculations.
-            const shaftTopDraw = topEdge.slice();
-            const shaftBotDraw = botEdge.slice();
-            const tail = spine[spine.length - 1].pos;
-            const beforeTail = spine[spine.length - 2].pos;
-            const outwardY = tail.y - beforeTail.y;
-            if (outwardY > 0.01 && tail.y < SCENE_H + 8) {
-                const tailTravel = (SCENE_H + 12 - tail.y) / outwardY;
-                const endX = tail.x + (tail.x - beforeTail.x) * tailTravel;
-                const endY = SCENE_H + 12;
-                const a = beforeTail, b = tail;
-                const tx = (b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
-                const ty = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
-                const tailRadius = spine[spine.length - 1].r;
-                shaftTopDraw.push({ x: endX - ty * tailRadius, y: endY + tx * tailRadius });
-                shaftBotDraw.push({ x: endX + ty * tailRadius, y: endY - tx * tailRadius });
-            }
             ctx.beginPath();
-            smoothPath(ctx, shaftTopDraw);
-            smoothPath(ctx, [...shaftBotDraw].reverse(), true);
+            smoothPath(ctx, topEdge);
+            smoothPath(ctx, [...botEdge].reverse(), true);
             ctx.closePath();
             ctx.fillStyle = PAL.shaft;
             ctx.fill();
@@ -938,8 +925,8 @@ export function createMissionaryRenderer(canvas) {
             if (protection) {
                 const tear = protectionTearGeometry(spine, now);
                 ctx.beginPath();
-                smoothPath(ctx, shaftTopDraw);
-                smoothPath(ctx, [...shaftBotDraw].reverse(), true);
+                smoothPath(ctx, topEdge);
+                smoothPath(ctx, [...botEdge].reverse(), true);
                 ctx.closePath();
                 if (tear) traceProtectionCutout(tear);
                 ctx.fillStyle = 'rgba(120, 190, 255, 0.18)';
@@ -952,8 +939,8 @@ export function createMissionaryRenderer(canvas) {
                     smoothPath(ctx, topEdge.slice(3));
                     smoothPath(ctx, botEdge.slice(3));
                 } else {
-                    smoothPath(ctx, shaftTopDraw);
-                    smoothPath(ctx, [...shaftBotDraw].reverse(), true);
+                    smoothPath(ctx, topEdge);
+                    smoothPath(ctx, [...botEdge].reverse(), true);
                     ctx.closePath();
                 }
                 ctx.strokeStyle = 'rgba(120, 190, 255, 0.45)';
