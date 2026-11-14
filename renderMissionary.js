@@ -415,6 +415,7 @@ export function createMissionaryRenderer(canvas) {
             const yJunction = E.y - 3.94;
             const stemBottom = E.y + 0.92;
             const forkHalf = 0.46;
+            const foldOutline = '#d08d9c'; // opaque match to the former resting Y/V color
 
             ctx.save();
             ctx.lineCap = 'round';
@@ -428,7 +429,7 @@ export function createMissionaryRenderer(canvas) {
             ctx.quadraticCurveTo(E.x - 0.14, yJunction - 0.18, E.x, yJunction);
             ctx.moveTo(E.x + forkHalf, yJunction - 0.54);
             ctx.quadraticCurveTo(E.x + 0.14, yJunction - 0.18, E.x, yJunction);
-            ctx.strokeStyle = `rgba(178,90,114,${0.56 - reveal * 0.06})`;
+            ctx.strokeStyle = foldOutline;
             ctx.lineWidth = 0.56;
             ctx.stroke();
 
@@ -446,7 +447,7 @@ export function createMissionaryRenderer(canvas) {
                     E.x + side * (1.28 + reveal * 0.48), E.y + 1.06,
                     E.x + side * (1.88 + reveal * 0.14), E.y + 1.08
                 );
-                ctx.strokeStyle = `rgba(178,90,114,${0.52 - reveal * 0.05})`;
+                ctx.strokeStyle = foldOutline;
                 ctx.lineWidth = 0.54;
                 ctx.stroke();
             }
@@ -477,11 +478,24 @@ export function createMissionaryRenderer(canvas) {
         ctx.lineWidth = 0.9;
         ctx.stroke();
 
-        // Inner flesh shadow along the torso edges
+        // Torso side shadows only. IMPORTANT: do not stroke torsoPath() here:
+        // its closing bottom edge at y=52.4 created the pale rectangular band
+        // visible between the thighs. The original torso/body fill and outline
+        // above are unchanged; these are just the two open side shadow strokes.
         ctx.save();
         torsoPath(belly);
         ctx.clip();
-        torsoPath(belly);
+        ctx.beginPath();
+        ctx.moveTo(36.7 - belly * 0.45, -10);
+        ctx.quadraticCurveTo(37.2 - belly * 0.8, -1.5, 38.4 - belly * 0.95, 10.5);
+        ctx.quadraticCurveTo(36.7 - belly, 18.5, 35.5 - belly * 0.72, 25.5);
+        ctx.quadraticCurveTo(35.0, 33.2, 35.6, 40.5);
+        ctx.lineTo(36.0, 52.4);
+        ctx.moveTo(63.0 + belly * 0.45, -10);
+        ctx.quadraticCurveTo(62.1 + belly * 0.75, -1.5, 61.1 + belly * 0.95, 10.5);
+        ctx.quadraticCurveTo(62.8 + belly, 18.5, 64.0 + belly * 0.72, 25.5);
+        ctx.quadraticCurveTo(64.6, 33.2, 64.0, 40.5);
+        ctx.lineTo(63.4, 52.4);
         ctx.strokeStyle = PAL.innerShadow;
         ctx.lineWidth = 4;
         ctx.stroke();

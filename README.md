@@ -1,3 +1,14 @@
+# v0.1.35 — Torso bottom shadow and opaque Y-line micro-fix
+
+This update intentionally changes only two rendering details.
+
+1. The flat pale rectangular band at the bottom of the torso was not part of the rim or entrance depth. It came from the bottom closing edge of `torsoPath()` when the inner-shadow stroke was applied to the entire closed torso path. The new shadow uses two *open side paths* with no bottom edge, retaining the body's fill and side shadows.
+2. The central Y and its lower branches now share one **opaque** color (`#d08d9c`) instead of translucent `rgba(...)` values. Their shape and line widths remain unchanged.
+
+All movement, event, simulation, thigh geometry, X-ray, shaft and protection code is retained unchanged.
+
+---
+
 # Greyhaven Motion v0.1.34 — Fold Cover Reveal Pass
 
 **Built on v0.1.31 and focused on the new surface entrance behavior.** This pass restructures the local entrance artwork so the closed Y-shape remains the resting pose while the opening is revealed by two body-connected fold covers, instead of the old fade between separate drawings.
