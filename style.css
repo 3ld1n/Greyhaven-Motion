@@ -66,8 +66,8 @@
 }
 #ghmotion_tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0,1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 6px;
   padding: 10px 10px 0;
 }
 .ghmotion-tab {
@@ -235,3 +235,16 @@
 .ghmotion-event-risk-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:8px; margin-top:8px; }
 .ghmotion-event-risk-grid label { min-width:0; display:flex; flex-direction:column; gap:4px; }
 .ghmotion-event-risk-grid input { box-sizing:border-box; width:100%; }
+
+/* Temporary graphical inspector — collapsible mobile-friendly source viewer */
+.ghmotion-inspector { padding: 12px; display: grid; gap: 10px; color: inherit; }
+.ghmotion-inspector-intro { font-size: 12px; line-height: 1.45; color: #cfc9eb; }
+.ghmotion-inspector-freeze { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ghmotion-inspector-field { display: grid; gap: 5px; font-size: 12px; font-weight: 600; }
+.ghmotion-inspector-field select { width:100%; color:#fff; background:#252536; border:1px solid #55516c; border-radius:9px; padding:9px; min-height:40px; }
+.ghmotion-inspector-detail { background:rgba(141,100,230,0.10); border:1px solid rgba(141,100,230,.2); border-radius:8px; padding:10px; font-size:12px; line-height:1.4; }
+.ghmotion-inspector-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.ghmotion-inspector-actions .menu_button { font-size:12px; min-height:42px; padding:6px; }
+.ghmotion-inspector-hidden { font-size:11px; line-height:1.5; color:#dfcfff; overflow-wrap:anywhere; }
+.ghmotion-inspector-code-head { font-size:11px; font-weight:700; opacity:.85; }
+.ghmotion-inspector-code { width:100%; box-sizing:border-box; margin:0; min-height:160px; max-height:270px; overflow:auto; white-space:pre; border-radius:10px; padding:10px; font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; background:#10131c; color:#dcead7; border:1px solid #394054; -webkit-overflow-scrolling:touch; }

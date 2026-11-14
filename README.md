@@ -1,11 +1,33 @@
-# v0.1.35.4 — Remove duplicate tip and body-overdraw layers
+# v0.1.35.5 — Temporary Drawing Inspector (v0.1.35 baseline)
 
-Built directly on the user's original **v0.1.35** (not v0.1.35.3).
+This build restores the **original rounded shaft tip** from v0.1.35 (including
+`PAL.glans` and `PAL.glansLine`) and adds a temporary **Inspect** tab. The
+underlying renderer geometry, physics, event manager and prompts are unchanged.
 
-- Deleted the *second* opaque tip polygon and its independent outline. The main moving shaft is still drawn exactly as in v0.1.35.
-- Moved the existing opaque torso skin patch under the moving geometry instead of painting it over the shaft. The same torso shading is retained; the actual moving-layer clip still controls occlusion at the entrance.
-- Preserved `drawEntranceDepthUnder()` and its call, and the rest of the v0.1.35 artwork, thigh geometry, Y shape, folds, simulation and controls.
-- This removes redundant overpainting but **does not remove the main shaft**. Its silhouette and visible length are intentional; it can still look rectangular when viewed at a shallow angle or short exposed length.
+## How to debug a suspicious shape (mobile-friendly)
+
+1. Open Greyhaven Motion → **Inspect**. By default movement pauses on this tab.
+2. Tap the suspicious shape in the drawing. The **Under your tap** dropdown lists
+   drawing groups that changed pixels near the tap. The last painted hit is first.
+3. Choose a group, read its actual `renderMissionary.js` source below, and tap
+   **Hide / Delete layer** to suppress the group immediately. If the artifact remains,
+   tap again and try a different group. You can also use **Or choose any drawing
+   layer** to inspect groups difficult to tap.
+4. **Show selected** restores the chosen group. **Restore all layers** clears the
+   temporary visibility overrides. **Refresh drawing** repaints without changing
+   the animation state. **Save choices** persists hidden groups in SillyTavern's
+   extension settings across reloads. **Export hidden list** downloads a JSON
+   diagnostic you can share for a permanent code patch. **Copy code** copies the
+   read-only source snippet for the selected group.
+5. Leave the Inspect tab to resume normal interactive movement. Uncheck Freeze
+   movement to inspect while animation continues.
+
+**Important:** Hide/Delete disables drawing groups at render time and does not
+literally delete installed JavaScript. Saved layer choices are reversible.
+The source viewer is read-only; edits to installed files still require updating
+`renderMissionary.js`. Tap-picking observes only annotated groups, not every
+single Canvas2D primitive, and may need a manual layer selection for tiny or
+fully obscured shapes. The original depth-under function is present and intact.
 
 ---
 

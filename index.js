@@ -12,6 +12,7 @@ import { createSim, CENTERLINES } from './simFacade.js';
 import { SKIN_TONES, herTone, himTone } from './skins.js';
 import { buildSummary } from './summary.js';
 import { createMissionaryRenderer } from './renderMissionary.js';
+import { INSPECTOR_SOURCES } from './inspectorSources.js';
 import { createEventManager, DEFAULT_RISKS, DEFAULT_RANGES, formatEventSummary } from './eventManager.js';
 import { createPromptReplay } from './promptReplay.js';
 
@@ -55,6 +56,8 @@ const defaultSettings = {
   actionPreamble: DEFAULT_ACTION_PREAMBLE,
   styleGuide: DEFAULT_STYLE_GUIDE,
   activeTab: 'actions',
+  inspectHidden: [],
+  inspectFreeze: true,
   eventRisks: { ...DEFAULT_RISKS },
   eventRanges: { ...DEFAULT_RANGES },
   autoPace: 0.9,
@@ -96,6 +99,9 @@ function settings() {
   // Upgrade only the original built-in style guide, never a user's custom text.
   if (s.styleGuide === LEGACY_STYLE_GUIDE) s.styleGuide = DEFAULT_STYLE_GUIDE;
   normalizeSceneLimits(s);
+  if (!Array.isArray(s.inspectHidden)) s.inspectHidden = [];
+  s.inspectHidden = s.inspectHidden.filter(key => typeof key === 'string');
+  s.inspectFreeze = s.inspectFreeze !== false;
   s.updateHz = Number(s.updateHz) === 60 ? 60 : 120;
   if (!s.eventRisks || typeof s.eventRisks !== 'object') s.eventRisks = { ...DEFAULT_RISKS };
   for (const [key,val] of Object.entries(DEFAULT_RISKS)) {
@@ -268,6 +274,9 @@ let panelOpen = false;
 let sim = null, renderer = null, rafId = null;
 let liveStats = { depth: 0 };
 let pendingSnap = null;
+let inspectedHits = [];
+let inspectedSelected = '';
+let updateInspectorUI = () => {};
 const sceneEvents = createEventManager({options:{...settings().eventRisks, ...settings().eventRanges}, protectedInitially:settings().protection});
 function syncProtectionPresentation() {
   const condition = sceneEvents.status().protection;
@@ -517,7 +526,7 @@ function gameLoop(prev) {
     const dt = (now - prev) / 1000;
     try {
       applyAutoMotion(dt);
-      sim.update(dt);
+      if (!(settings().activeTab === 'inspect' && settings().inspectFreeze)) sim.update(dt);
       renderer.render(sim);
     } catch (err) {
       console.error('[Greyhaven Motion] frame error', err);
@@ -569,10 +578,21 @@ function initGame() {
   renderer = createMissionaryRenderer(canvas);
   renderer.setSkin?.(herTone(s.skinHer), himTone(s.skinHim));
   renderer.setXray?.(s.xrayMode);
+  renderer.setInspectorHidden?.(s.inspectHidden);
   syncProtectionPresentation();
 
   let dragging = false, grabDepth = 0, grabScene = null;
   canvas.addEventListener('pointerdown', ev => {
+    if (settings().activeTab === 'inspect') {
+      ev.preventDefault();
+      setAutoEnabled(false);
+      renderer?.inspectPoint?.(ev.clientX, ev.clientY, hits => {
+        inspectedHits = hits;
+        inspectedSelected = hits[0]?.id || '';
+        updateInspectorUI();
+      });
+      return;
+    }
     setAutoEnabled(false);
     dragging = true;
     canvas.setPointerCapture(ev.pointerId);
@@ -846,6 +866,7 @@ jQuery(() => {
         <button class="ghmotion-tab" data-tab="actions">Actions</button>
         <button class="ghmotion-tab" data-tab="scene">Scene</button>
         <button class="ghmotion-tab" data-tab="prompt">Prompt</button>
+        <button class="ghmotion-tab" data-tab="inspect">Inspect</button>
       </div>
       <div id="ghmotion_tab_actions" class="ghmotion-tab-panel">
         <div id="ghmotion_controls">
@@ -881,6 +902,32 @@ jQuery(() => {
           <label><span>His</span><select id="ghmotion_him"></select></label>
         </div>
       </div>
+      <div id="ghmotion_tab_inspect" class="ghmotion-tab-panel">
+        <div class="ghmotion-inspector">
+          <div class="ghmotion-inspector-intro">🛠 Temporary drawing inspector. Tap a shape in the illustration to locate its drawing layer. Tap again after hiding to uncover layers underneath. No simulation code is deleted.</div>
+          <label class="ghmotion-inspector-freeze"><input type="checkbox" id="ghmotion_inspect_freeze" checked> Freeze movement while inspecting</label>
+          <label class="ghmotion-inspector-field">Under your tap
+            <select id="ghmotion_inspect_hits" aria-label="Drawing layers under the tap"></select>
+          </label>
+          <label class="ghmotion-inspector-field">Or choose any drawing layer
+            <select id="ghmotion_inspect_all" aria-label="All inspectable drawing layers"></select>
+          </label>
+          <div id="ghmotion_inspect_info" class="ghmotion-inspector-detail">Tap the drawing above to inspect its layers.</div>
+          <div class="ghmotion-inspector-actions">
+            <button class="menu_button" id="ghmotion_inspect_hide">Hide / Delete layer</button>
+            <button class="menu_button" id="ghmotion_inspect_restore">Show selected</button>
+            <button class="menu_button" id="ghmotion_inspect_save">Save choices</button>
+            <button class="menu_button" id="ghmotion_inspect_refresh">Refresh drawing</button>
+            <button class="menu_button" id="ghmotion_inspect_copy">Copy code</button>
+            <button class="menu_button" id="ghmotion_inspect_export">Export hidden list</button>
+            <button class="menu_button" id="ghmotion_inspect_all_restore">Restore all layers</button>
+          </div>
+          <div id="ghmotion_inspect_hidden" class="ghmotion-inspector-hidden"></div>
+          <div class="ghmotion-inspector-code-head">Source: <span id="ghmotion_inspect_filename">renderMissionary.js</span></div>
+          <pre id="ghmotion_inspect_code" class="ghmotion-inspector-code" tabindex="0">Select a layer to view its actual source section.</pre>
+          <div class="ghmotion-help">Hide/Delete is a safe live visibility override, not a source-code deletion. Save preserves hidden layers across reloads. Export the hidden-layer list for a permanent patch. The displayed code is read-only.</div>
+        </div>
+      </div>
       <div id="ghmotion_tab_prompt" class="ghmotion-tab-panel">
         <div id="ghmotion_preview" style="display:block;">
           <div class="ghmotion-preview-head">
@@ -895,13 +942,105 @@ jQuery(() => {
   `);
 
   function activateTab(tab) {
-    s.activeTab = tab;
+    s.activeTab = ['actions','scene','prompt','inspect'].includes(tab) ? tab : 'actions';
+    tab = s.activeTab;
+    if (tab === 'inspect') setAutoEnabled(false);
     $('.ghmotion-tab').removeClass('active');
     $(`.ghmotion-tab[data-tab="${tab}"]`).addClass('active');
     $('.ghmotion-tab-panel').removeClass('active');
     $(`#ghmotion_tab_${tab}`).addClass('active');
     saveSettingsDebounced();
   }
+
+  const inspectLayerList = () => renderer?.inspectorLayers || [
+    {id:'torso-fill',label:'Torso / body polygon'},
+    {id:'thigh-left',label:'Thigh — left picture'},
+    {id:'thigh-right',label:'Thigh — right picture'},
+    {id:'depth-under',label:'Entrance depth underlay'},
+    {id:'shaft-main',label:'Main moving shaft'},
+    {id:'shaft-tip',label:'Original rounded tip'},
+    {id:'shaft-highlight',label:'Shaft highlight'},
+    {id:'protection-art',label:'Protection visual'},
+    {id:'torso-cover',label:'Front torso skin cover'},
+    {id:'fold-covers',label:'Local fold skin covers'},
+    {id:'body-contours',label:'Body-attached contours'},
+    {id:'y-fold-outlines',label:'Y and fold outlines'},
+  ];
+  const inspectLabel = id => inspectLayerList().find(layer => layer.id === id)?.label || id;
+  updateInspectorUI = () => {
+    const hits = $('#ghmotion_inspect_hits');
+    const all = $('#ghmotion_inspect_all');
+    if (!hits.length || !all.length) return;
+    hits.empty().append($('<option>').val('').text(inspectedHits.length ? 'Select overlapping layer…' : 'No matching layers detected at tap'));
+    for (const hit of inspectedHits) {
+      const name = inspectLabel(hit.id);
+      hits.append($('<option>').val(hit.id).text(name + (s.inspectHidden.includes(hit.id) ? ' (hidden)' : '')));
+    }
+    hits.val(inspectedSelected || '');
+    all.empty().append($('<option>').val('').text('Choose layer…'));
+    for (const layer of inspectLayerList()) {
+      all.append($('<option>').val(layer.id).text(layer.label + (s.inspectHidden.includes(layer.id) ? ' (hidden)' : '')));
+    }
+    all.val(inspectedSelected || '');
+    const selected = inspectLayerList().find(layer => layer.id === inspectedSelected);
+    const hidden = selected ? s.inspectHidden.includes(inspectedSelected) : false;
+    $('#ghmotion_inspect_info').text(selected
+      ? `${selected.label} · ${hidden ? 'HIDDEN' : 'VISIBLE'} · ${selected.hint || 'Drawing layer'}`
+      : 'Tap a visible shape above, or select a layer manually.');
+    const source = selected ? INSPECTOR_SOURCES[selected.id] : null;
+    $('#ghmotion_inspect_filename').text(source ? `renderMissionary.js · lines ${source.startLine}–${source.endLine}` : 'renderMissionary.js');
+    $('#ghmotion_inspect_code').text(source?.code || 'Select a layer to view its actual source section.');
+    $('#ghmotion_inspect_hidden').text(s.inspectHidden.length
+      ? `Hidden (${s.inspectHidden.length}): ${s.inspectHidden.map(inspectLabel).join(', ')}`
+      : 'No layers are hidden.');
+    $('#ghmotion_inspect_freeze').prop('checked', s.inspectFreeze);
+    $('#ghmotion_inspect_hide').prop('disabled', !selected || hidden);
+    $('#ghmotion_inspect_restore').prop('disabled', !selected || !hidden);
+  };
+  function inspectRepaint() {
+    if (sim && renderer) renderer.render(sim);
+    updateInspectorUI();
+  }
+  function inspectSetHidden(id, hide) {
+    if (!inspectLayerList().some(item => item.id === id)) return;
+    const next = new Set(s.inspectHidden);
+    if (hide) next.add(id); else next.delete(id);
+    s.inspectHidden = [...next];
+    renderer?.setInspectorHidden?.(s.inspectHidden);
+    inspectRepaint();
+  }
+  $('#ghmotion_inspect_hits').on('change', function () { inspectedSelected = this.value; updateInspectorUI(); });
+  $('#ghmotion_inspect_all').on('change', function () { inspectedSelected = this.value; updateInspectorUI(); });
+  $('#ghmotion_inspect_freeze').on('change', function () { s.inspectFreeze = this.checked; saveSettingsDebounced(); });
+  $('#ghmotion_inspect_hide').on('click', () => inspectSetHidden(inspectedSelected, true));
+  $('#ghmotion_inspect_restore').on('click', () => inspectSetHidden(inspectedSelected, false));
+  $('#ghmotion_inspect_all_restore').on('click', () => {
+    s.inspectHidden = [];
+    renderer?.setInspectorHidden?.([]);
+    inspectRepaint();
+  });
+  $('#ghmotion_inspect_refresh').on('click', () => { inspectorRepaintSelectedSafe(); });
+  function inspectorRepaintSelectedSafe() { inspectedHits = []; inspectRepaint(); }
+  $('#ghmotion_inspect_save').on('click', () => {
+    saveSettingsDebounced();
+    toastr.success('Inspector visibility choices saved with extension settings.', 'Greyhaven Motion');
+  });
+  $('#ghmotion_inspect_copy').on('click', async () => {
+    const code = INSPECTOR_SOURCES[inspectedSelected]?.code || '';
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); toastr.success('Source copied.', 'Inspector'); }
+    catch(err) { toastr.warning('Clipboard blocked. You can select and copy the code below.', 'Inspector'); }
+  });
+  $('#ghmotion_inspect_export').on('click', () => {
+    const data = JSON.stringify({ version:'0.1.35-inspector', hiddenLayers:s.inspectHidden, selected:inspectedSelected }, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'greyhaven-motion-inspector-hidden.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  });
+  updateInspectorUI();
 
   $('#extensionsMenu').append(`
     <div id="ghmotion_menu_item" class="list-group-item flex-container flexGap5 interactable" tabindex="0">

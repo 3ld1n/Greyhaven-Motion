@@ -60,6 +60,59 @@ export function createMissionaryRenderer(canvas) {
     const ctx = canvas.getContext('2d');
     let scale = 1, ox = 0, oy = 0;
 
+    // Temporary visual inspector. Sampling is done for a SINGLE tapped frame,
+    // not continuously. No dynamic code execution or file mutation is used.
+    const inspector = { hidden: new Set(), probe: null };
+    const debugLayerInfo = [
+        { id: 'torso-fill', label: 'Torso / body polygon', hint: 'Main body fill and outline' },
+        { id: 'thigh-left', label: 'Thigh, left side of picture', hint: 'Skin and outline of left-hand illustrated thigh' },
+        { id: 'thigh-right', label: 'Thigh, right side of picture', hint: 'Skin and outline of right-hand illustrated thigh' },
+        { id: 'depth-under', label: 'Entrance depth underlay', hint: 'The restored oval, filled rim, slot and notch' },
+        { id: 'shaft-main', label: 'Main moving shaft', hint: 'Filled shaft polygon and outline' },
+        { id: 'shaft-tip', label: 'Original rounded tip', hint: 'Separate tip pigment and outline from v0.1.35' },
+        { id: 'shaft-highlight', label: 'Shaft highlight', hint: 'Thin highlight stroke' },
+        { id: 'protection-art', label: 'Protection visual', hint: 'Optional film / tearing artwork' },
+        { id: 'torso-cover', label: 'Front torso skin cover', hint: 'Opaque front body-cover ellipse above moving artwork' },
+        { id: 'fold-covers', label: 'Local fold skin covers', hint: 'Two skin-colored fold-shaped masks' },
+        { id: 'body-contours', label: 'Body-attached contours', hint: 'Curved side borders attached to the body' },
+        { id: 'y-fold-outlines', label: 'Y and fold outlines', hint: 'Opaque light pink lines' },
+    ];
+    function inspectorSample() {
+        const probe = inspector.probe;
+        if (!probe) return null;
+        try {
+            const px = Math.round(probe.x), py = Math.round(probe.y);
+            const x = Math.max(0, Math.min(canvas.width - 1, px - 5));
+            const y = Math.max(0, Math.min(canvas.height - 1, py - 5));
+            const w = Math.min(11, canvas.width - x), h = Math.min(11, canvas.height - y);
+            return ctx.getImageData(x, y, w, h).data;
+        } catch (err) { return null; }
+    }
+    function inspectPaint(id, fn) {
+        if (inspector.hidden.has(id)) return;
+        const prior = inspectorSample();
+        fn();
+        if (prior) {
+            const after = inspectorSample();
+            if (after && after.length === prior.length) {
+                let change = 0;
+                for (let i = 0; i < after.length; i += 4) {
+                    change += Math.abs(after[i] - prior[i]) + Math.abs(after[i+1] - prior[i+1]) + Math.abs(after[i+2] - prior[i+2]);
+                }
+                if (change > 28) inspector.probe.hits.push({ id, change });
+            }
+        }
+    }
+    function setInspectorHidden(ids) { inspector.hidden = new Set((ids || []).filter(id => debugLayerInfo.some(layer => layer.id === id))); }
+    function inspectPoint(clientX, clientY, callback) {
+        const rect = canvas.getBoundingClientRect();
+        inspector.probe = {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height),
+            hits: [], callback,
+        };
+    }
+
     // renderer-local cosmetic fluid particles
     let lastT = performance.now();
     const wombDrops = []; // womb-local coords {x,y,vx,vy}
@@ -471,12 +524,16 @@ export function createMissionaryRenderer(canvas) {
         winShift = lenExtra / 2;
 
         // Torso column (drawn first — the thighs overlap it from the front)
-        torsoPath(belly);
-        ctx.fillStyle = PAL.skin;
-        ctx.fill();
-        ctx.strokeStyle = PAL.skinLine;
-        ctx.lineWidth = 0.9;
-        ctx.stroke();
+        // INSPECT torso-fill BEGIN
+        inspectPaint('torso-fill', () => {
+            torsoPath(belly);
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
+            ctx.strokeStyle = PAL.skinLine;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+        });
+        // INSPECT torso-fill END
 
         // Torso side shadows only. IMPORTANT: do not stroke torsoPath() here:
         // its closing bottom edge at y=52.4 created the pale rectangular band
@@ -524,6 +581,8 @@ export function createMissionaryRenderer(canvas) {
             ctx.scale(legScaleX, legScaleY);
             ctx.translate(-hipX, -hipY + legLift);
 
+            // INSPECT thighs BEGIN
+            inspectPaint(m === 1 ? 'thigh-left' : 'thigh-right', () => {
             ctx.beginPath();
             ctx.moveTo(X(37), 35.0);
             ctx.quadraticCurveTo(X(24), 38.2, X(10), 47.0 + Math.abs(thighPulse) * 0.20 + Math.max(0, thighLag * m) * 0.18);
@@ -568,6 +627,7 @@ export function createMissionaryRenderer(canvas) {
             ctx.closePath();
             ctx.stroke();
             ctx.restore();
+            }); // INSPECT thighs END
             ctx.restore();
         }
 
@@ -852,24 +912,10 @@ export function createMissionaryRenderer(canvas) {
         // Local entrance depth opening sits beneath the shaft in both views.
         ctx.save();
         ctx.translate(pelvisSway, pelvisBounce);
-        drawEntranceDepthUnder();
+        // INSPECT depth-under BEGIN
+        inspectPaint('depth-under', () => drawEntranceDepthUnder());
+        // INSPECT depth-under END
         ctx.restore();
-
-        // Reuse the original body-skin patch BEFORE the moving layer. It
-        // preserves the torso color without painting a rectangle over the shaft
-        // or the depth artwork. The independent moving-layer clip controls
-        // visibility at the actual entry edge.
-        if (!showXray) {
-            ctx.save();
-            ctx.translate(pelvisSway, pelvisBounce);
-            torsoPath(belly);
-            ctx.clip();
-            ctx.beginPath();
-            ctx.ellipse(WIN.x, WIN.y + 1.4 - winShift, 13.4, 16.8, 0, 0, Math.PI * 2);
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-            ctx.restore();
-        }
 
         // ==================== shaft layer (no jiggle) ====================
         // Puddle on the sheet below (grows with everything that has leaked out)
@@ -908,28 +954,51 @@ export function createMissionaryRenderer(canvas) {
                 topEdge.push({ x: spine[i].pos.x - ty * r, y: spine[i].pos.y + tx * r });
                 botEdge.push({ x: spine[i].pos.x + ty * r, y: spine[i].pos.y - tx * r });
             }
-            ctx.beginPath();
-            smoothPath(ctx, topEdge);
-            smoothPath(ctx, [...botEdge].reverse(), true);
-            ctx.closePath();
-            ctx.fillStyle = PAL.shaft;
-            ctx.fill();
-            ctx.strokeStyle = PAL.shaftLine;
-            ctx.lineWidth = 0.7;
-            ctx.stroke();
+            // INSPECT shaft-main BEGIN
+            inspectPaint('shaft-main', () => {
+                ctx.beginPath();
+                smoothPath(ctx, topEdge);
+                smoothPath(ctx, [...botEdge].reverse(), true);
+                ctx.closePath();
+                ctx.fillStyle = PAL.shaft;
+                ctx.fill();
+                ctx.strokeStyle = PAL.shaftLine;
+                ctx.lineWidth = 0.7;
+                ctx.stroke();
+            });
+            // INSPECT shaft-main END
 
-            // Keep the tip sampling for protection geometry, but delete
-            // the redundant opaque tip polygon and its brown outline.
-            // Only the main shaft geometry is drawn.
             const gTop = topEdge.filter((_, i) => spine[i].u <= 4.0);
+            const gBot = botEdge.filter((_, i) => spine[i].u <= 4.0);
+            // INSPECT shaft-tip BEGIN — restored exactly from v0.1.35
+            if (gTop.length > 1 && (showXray || !s.inside)) {
+                inspectPaint('shaft-tip', () => {
+                    ctx.beginPath();
+                    smoothPath(ctx, gTop);
+                    smoothPath(ctx, [...gBot].reverse(), true);
+                    ctx.closePath();
+                    ctx.fillStyle = PAL.glans;
+                    ctx.fill();
+                    ctx.strokeStyle = PAL.glansLine;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                });
+            }
+            // INSPECT shaft-tip END
 
-            ctx.beginPath();
-            smoothPath(ctx, topEdge.map(p => ({ x: p.x - 0.45, y: p.y + 0.1 })));
-            ctx.strokeStyle = PAL.highlight;
-            ctx.lineWidth = 0.4;
-            ctx.stroke();
+            // INSPECT shaft-highlight BEGIN
+            inspectPaint('shaft-highlight', () => {
+                ctx.beginPath();
+                smoothPath(ctx, topEdge.map(p => ({ x: p.x - 0.45, y: p.y + 0.1 })));
+                ctx.strokeStyle = PAL.highlight;
+                ctx.lineWidth = 0.4;
+                ctx.stroke();
+            });
+            // INSPECT shaft-highlight END
 
             if (protection) {
+                // INSPECT protection-art BEGIN
+                inspectPaint('protection-art', () => {
                 const tear = protectionTearGeometry(spine, now);
                 ctx.beginPath();
                 smoothPath(ctx, topEdge);
@@ -998,6 +1067,7 @@ export function createMissionaryRenderer(canvas) {
                     }
                 }
                 if (tear) drawProtectionTear(tear);
+                }); // INSPECT protection-art END
             }
         }
         ctx.restore(); // moving layer clip; the cover is drawn in unclipped scene coordinates
@@ -1008,8 +1078,12 @@ export function createMissionaryRenderer(canvas) {
             ctx.translate(pelvisSway, pelvisBounce);
             torsoPath(belly);
             ctx.clip();
-            // No duplicate opaque torso skin fill here: it was drawn
-            // beneath the moving layer so it cannot obscure the shaft.
+            // INSPECT torso-cover BEGIN
+            inspectPaint('torso-cover', () => {
+            ctx.beginPath();
+            ctx.ellipse(WIN.x, WIN.y + 1.4 - winShift, 13.4, 16.8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = PAL.skin;
+            ctx.fill();
             ctx.beginPath();
             ctx.ellipse(WIN.x, WIN.y + 10.8 - winShift, 8.1 + Math.min(1, bellyWave) * 0.9, 3.15 + motionVel * 0.55, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(178, 90, 114, 0.10)';
@@ -1020,10 +1094,13 @@ export function createMissionaryRenderer(canvas) {
             ctx.strokeStyle = `rgba(178, 90, 114, ${0.09 + motionVel * 0.07})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
+            }); // INSPECT torso-cover END
 
             // Body-connected fold covers replace the former one-piece
             // skin rectangle. They stay closed at rest and part on contact.
-            drawEntranceSkinCovers();
+            // INSPECT fold-covers BEGIN
+            inspectPaint('fold-covers', () => { drawEntranceSkinCovers(); });
+            // INSPECT fold-covers END
 
             // Redraw the navel above the non-xray cover so it never gets washed out.
             ctx.beginPath();
@@ -1153,9 +1230,13 @@ export function createMissionaryRenderer(canvas) {
             ctx.closePath();
             ctx.clip('evenodd');
         }
-        drawBodyAttachedBorders();
+        // INSPECT body-contours BEGIN
+        inspectPaint('body-contours', () => { drawBodyAttachedBorders(); });
+        // INSPECT body-contours END
         // Fold and rim contours remain independently animated in the foreground.
-        drawEntranceOverlay();
+        // INSPECT y-fold-outlines BEGIN
+        inspectPaint('y-fold-outlines', () => { drawEntranceOverlay(); });
+        // INSPECT y-fold-outlines END
         ctx.restore();
 
         // ==================== clean entrance canvas area ====================
@@ -1286,6 +1367,11 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(219,244,253,${0.84 * fade})`;
             ctx.fill();
         }
+        if (inspector.probe) {
+            const probe = inspector.probe;
+            inspector.probe = null;
+            probe.callback?.(probe.hits.slice().reverse());
+        }
     }
 
     function destroy() { ro.disconnect(); }
@@ -1304,5 +1390,6 @@ export function createMissionaryRenderer(canvas) {
         protectionBroken = nextBroken;
     }
 
-    return { render, screenToScene, resize, destroy, setSkin, setXray, setProtection };
+    return { render, screenToScene, resize, destroy, setSkin, setXray, setProtection,
+        inspectPoint, setInspectorHidden, inspectorLayers: debugLayerInfo };
 }
