@@ -348,18 +348,14 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
             ctx.fill();
 
-            // Narrow connected depth pocket under the rim; no upside-down
-            // transparent triangle and no rectangular skin block.
+            // Keep only a tiny connected depth notch under the slot so the old
+            // pale rectangle/block is gone.
             ctx.beginPath();
-            ctx.moveTo(E.x - depthHalf, slotY + 0.02);
-            ctx.bezierCurveTo(E.x - depthHalf * 0.72, E.y + 1.62,
-                E.x - depthHalf * 0.30, E.y + 2.18,
-                E.x, depthBottomY);
-            ctx.bezierCurveTo(E.x + depthHalf * 0.30, E.y + 2.18,
-                E.x + depthHalf * 0.72, E.y + 1.62,
-                E.x + depthHalf, slotY + 0.02);
+            ctx.moveTo(E.x - (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.56, E.x + (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.88, E.x - (0.10 + reveal * 0.08), slotY + 0.10);
             ctx.closePath();
-            ctx.fillStyle = `rgba(107, 60, 74, ${0.10 + reveal * 0.10})`;
+            ctx.fillStyle = `rgba(107, 60, 74, ${0.08 + reveal * 0.08})`;
             ctx.fill();
         }
 
@@ -437,21 +433,21 @@ export function createMissionaryRenderer(canvas) {
             ctx.stroke();
 
             // The Y branches continue into the fold bottoms and meet the fixed
-            // thigh borders. Keep them thin and slightly curved.
+            // thigh borders. Use the same lighter, thinner Y-style outline.
             for (const side of [-1, 1]) {
                 ctx.beginPath();
                 ctx.moveTo(E.x + side * 0.10, yJunction + 0.08);
                 ctx.bezierCurveTo(
-                    E.x + side * (0.22 + reveal * 0.12), E.y - 1.92,
-                    E.x + side * (0.48 + reveal * 0.54), E.y - 0.36,
-                    E.x + side * (0.98 + reveal * 0.94), E.y + 0.96
+                    E.x + side * (0.22 + reveal * 0.10), E.y - 1.92,
+                    E.x + side * (0.46 + reveal * 0.48), E.y - 0.40,
+                    E.x + side * (0.92 + reveal * 0.82), E.y + 0.88
                 );
                 ctx.quadraticCurveTo(
-                    E.x + side * (1.40 + reveal * 0.62), E.y + 1.12,
-                    E.x + side * (1.92 + reveal * 0.18), E.y + 1.10
+                    E.x + side * (1.28 + reveal * 0.48), E.y + 1.06,
+                    E.x + side * (1.88 + reveal * 0.14), E.y + 1.08
                 );
-                ctx.strokeStyle = PAL.skinLine;
-                ctx.lineWidth = 0.76;
+                ctx.strokeStyle = `rgba(178,90,114,${0.52 - reveal * 0.05})`;
+                ctx.lineWidth = 0.54;
                 ctx.stroke();
             }
             ctx.restore();

@@ -1,4 +1,4 @@
-# Greyhaven Motion v0.1.33 — Fold Cover Reveal Pass
+# Greyhaven Motion v0.1.34 — Fold Cover Reveal Pass
 
 **Built on v0.1.31 and focused on the new surface entrance behavior.** This pass restructures the local entrance artwork so the closed Y-shape remains the resting pose while the opening is revealed by two body-connected fold covers, instead of the old fade between separate drawings.
 
