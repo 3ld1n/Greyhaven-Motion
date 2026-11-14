@@ -292,3 +292,11 @@ Missionary-only MVP for SillyTavern.
 - **Y detail realigned:** its two arms join the same upper point as the stem rather than forming a lower, detached V.
 - **Upper opening made more visible:** filled rounded upper oval, larger curved rim and separate small central peak.
 - **Real-time input and old physics preserved.** The standalone rendering checks sampled initial closed, shallow, medium, deep, withdrawn, and X-ray states. These checks do not guarantee the appearance on every phone; visually inspect before treating as a final design.
+
+
+### 0.1.35.3: Rounded exposed-shaft edge
+- Based on original v0.1.35; `drawEntranceDepthUnder()` and its call restored unchanged.
+- Exposed-shaft entrance clipping uses a rounded curve covering the complete width rather than a shallow almost-flat cut.
+- Far shaft terminus uses a rounded closure at its existing location (no infinite-length extension).
+- Tip tint blends into the shaft rather than painting a second boxed polygon with a horizontal outline.
+- All thigh and torso paths, fold covers, X-ray internals, and simulation unchanged.

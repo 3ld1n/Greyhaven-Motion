@@ -296,8 +296,12 @@ export function createMissionaryRenderer(canvas) {
         const entranceTarget = Math.max(activeEntrance, lingerEntrance);
         disp.entranceOpen = ease(disp.entranceOpen, entranceTarget, activeEntrance > disp.entranceOpen ? 14 : 7.0);
         const lipsOpen = Math.max(0, Math.min(1, disp.entranceOpen));
-        const edgeW = 1.75 + lipsOpen * 2.75;
-        const edgeH = 0.28 + lipsOpen * 0.92;
+        // Ensure the visible-shaft clip spans its full width and follows a
+        // rounded contact arc; the old narrow, shallow arc cut it almost
+        // horizontally, giving the exposed section a box-shaped top.
+        const entryShaftRadius = s.shaftRadius(Math.max(0, s.d));
+        const edgeW = Math.max(3.20, entryShaftRadius + 0.25, 1.75 + lipsOpen * 2.75);
+        const edgeH = 1.25 + lipsOpen * 1.00;
         const edgeY = E.y + 2.05;
         const edgePoints = [];
         for (let i = 0; i <= 36; i++) {
@@ -308,9 +312,56 @@ export function createMissionaryRenderer(canvas) {
         const lineFade = Math.max(0, Math.min(1, 1 - lipsOpen * 2.0));
         const rimReveal = Math.max(0, Math.min(1, (lipsOpen - 0.04) / 0.36));
 
-        // Entrance depth-under drawing removed intentionally.
-        // We will rebuild this layer from scratch later instead of keeping the
-        // current oval/rim/depth artifact renderer.
+        function drawEntranceDepthUnder() {
+            // Underlying opening anatomy. This sits beneath the fold covers and
+            // the shaft. Keep the reveal connected under the rim, but avoid the
+            // old transparent rectangle/triangle look.
+            const reveal = hasMadeContact ? rimReveal : 0;
+            if (reveal <= 0.01) return;
+
+            const ovalHalf = 0.40 + reveal * 1.10;
+            const ovalCy = E.y - 1.02;
+            const ovalRy = 0.60 + reveal * 1.22;
+            const rimHalf = 0.78 + reveal * 1.08;
+            const rimY = E.y + 0.68;
+            const slotHalf = 0.34 + reveal * 0.74;
+            const slotY = E.y + 1.08;
+            const depthHalf = 0.34 + reveal * 0.44;
+            const depthBottomY = E.y + 2.65;
+
+            // Revealed upper oval opening.
+            ctx.beginPath();
+            ctx.ellipse(E.x, ovalCy, ovalHalf, ovalRy, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(226,188,197,${0.16 + reveal * 0.14})`;
+            ctx.fill();
+
+            // Opaque rim directly above the depth opening.
+            ctx.beginPath();
+            ctx.moveTo(E.x - rimHalf, rimY);
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.00, E.x, E.y - 0.22);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.00, E.x + rimHalf, rimY);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.46, E.y + 0.94, E.x, E.y + 1.18);
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.46, E.y + 0.94, E.x - rimHalf, rimY);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(145, 89, 110, ${0.44 + reveal * 0.22})`;
+            ctx.fill();
+
+            // Slot/dark opening connected immediately under the rim.
+            ctx.beginPath();
+            ctx.ellipse(E.x, slotY, slotHalf, 0.16 + reveal * 0.18, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
+            ctx.fill();
+
+            // Keep only a tiny connected depth notch under the slot so the old
+            // pale rectangle/block is gone.
+            ctx.beginPath();
+            ctx.moveTo(E.x - (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.56, E.x + (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.quadraticCurveTo(E.x, E.y + 1.88, E.x - (0.10 + reveal * 0.08), slotY + 0.10);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(107, 60, 74, ${0.08 + reveal * 0.08})`;
+            ctx.fill();
+        }
 
         function drawBodyAttachedBorders() {
             // Fixed body-attached contours. Slightly curved and tucked behind the
@@ -802,6 +853,12 @@ export function createMissionaryRenderer(canvas) {
         }
         ctx.restore(); // end body/jiggle layer
 
+        // Local entrance depth opening sits beneath the shaft in both views.
+        ctx.save();
+        ctx.translate(pelvisSway, pelvisBounce);
+        drawEntranceDepthUnder();
+        ctx.restore();
+
         // ==================== shaft layer (no jiggle) ====================
         // Puddle on the sheet below (grows with everything that has leaked out)
         if (puddle > 0.02) {
@@ -841,6 +898,21 @@ export function createMissionaryRenderer(canvas) {
             }
             ctx.beginPath();
             smoothPath(ctx, topEdge);
+            // Round the existing shaft's far end rather than leaving the
+            // old straight horizontal closing edge. Do not extend shaft length
+            // through the scene or change the simulation's spine samples.
+            const tailTop = topEdge[topEdge.length - 1];
+            const tailBot = botEdge[botEdge.length - 1];
+            const tailPrev = spine[Math.max(0, spine.length - 2)].pos;
+            const tailLast = spine[spine.length - 1].pos;
+            const tailDir = { x: tailLast.x - tailPrev.x, y: tailLast.y - tailPrev.y };
+            const tailLen = Math.hypot(tailDir.x, tailDir.y) || 1;
+            const roundDistance = Math.min(1.0, spine[spine.length - 1].r * 0.28);
+            ctx.quadraticCurveTo(
+                (tailTop.x + tailBot.x) / 2 + tailDir.x / tailLen * roundDistance * 2,
+                (tailTop.y + tailBot.y) / 2 + tailDir.y / tailLen * roundDistance * 2,
+                tailBot.x, tailBot.y
+            );
             smoothPath(ctx, [...botEdge].reverse(), true);
             ctx.closePath();
             ctx.fillStyle = PAL.shaft;
@@ -856,11 +928,22 @@ export function createMissionaryRenderer(canvas) {
                 smoothPath(ctx, gTop);
                 smoothPath(ctx, [...gBot].reverse(), true);
                 ctx.closePath();
-                ctx.fillStyle = PAL.glans;
+                // A second solid, closed tip polygon with an outlined, flat
+                // rear edge looked like an independent rectangle on the shaft.
+                // Keep the tip tint, but blend it into the already rounded
+                // shaft silhouette, without a second boxed outline.
+                const tipColor = ctx.createLinearGradient(
+                    spine[0].pos.x, spine[0].pos.y,
+                    spine[Math.min(5, spine.length - 1)].pos.x,
+                    spine[Math.min(5, spine.length - 1)].pos.y
+                );
+                if (tipColor && typeof tipColor.addColorStop === 'function') {
+                    tipColor.addColorStop(0, PAL.glans);
+                    tipColor.addColorStop(0.66, PAL.shaft);
+                    tipColor.addColorStop(1, PAL.shaft);
+                }
+                ctx.fillStyle = tipColor || PAL.shaft;
                 ctx.fill();
-                ctx.strokeStyle = PAL.glansLine;
-                ctx.lineWidth = 0.5;
-                ctx.stroke();
             }
 
             ctx.beginPath();
