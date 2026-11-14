@@ -320,10 +320,6 @@ export function createMissionaryRenderer(canvas) {
             const ovalRy = 0.60 + reveal * 1.22;
             const rimHalf = 0.78 + reveal * 1.08;
             const rimY = E.y + 0.68;
-            const slotHalf = 0.34 + reveal * 0.74;
-            const slotY = E.y + 1.08;
-            const depthHalf = 0.34 + reveal * 0.44;
-            const depthBottomY = E.y + 2.65;
 
             // Revealed upper oval opening.
             ctx.beginPath();
@@ -331,32 +327,27 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(226,188,197,${0.16 + reveal * 0.14})`;
             ctx.fill();
 
-            // Opaque rim directly above the depth opening.
+            // True opaque curved rim contour — no solid polygon, square or
+            // skin-coloured rectangle behind it. Leave the centre transparent
+            // so the existing underlying opening can be seen naturally.
+            // These two arcs share their side endpoints, making a narrow
+            // continuous border rather than a filled trapezoid.
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#a76a7d';
+            ctx.lineWidth = 0.70;
             ctx.beginPath();
             ctx.moveTo(E.x - rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.00, E.x, E.y - 0.22);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.00, E.x + rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.46, E.y + 0.94, E.x, E.y + 1.18);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.46, E.y + 0.94, E.x - rimHalf, rimY);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(145, 89, 110, ${0.44 + reveal * 0.22})`;
-            ctx.fill();
+            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.02, E.x, E.y - 0.22);
+            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.02, E.x + rimHalf, rimY);
+            ctx.stroke();
+            ctx.restore();
 
-            // Slot/dark opening connected immediately under the rim.
-            ctx.beginPath();
-            ctx.ellipse(E.x, slotY, slotHalf, 0.16 + reveal * 0.18, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
-            ctx.fill();
-
-            // Keep only a tiny connected depth notch under the slot so the old
-            // pale rectangle/block is gone.
-            ctx.beginPath();
-            ctx.moveTo(E.x - (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.quadraticCurveTo(E.x, E.y + 1.56, E.x + (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.quadraticCurveTo(E.x, E.y + 1.88, E.x - (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(107, 60, 74, ${0.08 + reveal * 0.08})`;
-            ctx.fill();
+            // The previous filled dark slot formed a small floating polygon
+            // directly under the Y, visually reading as a rectangular backdrop.
+            // The rim itself is now the only visible entrance contour. Its
+            // interior is left open: do not draw a filled slot underneath it.
         }
 
         function drawBodyAttachedBorders() {
