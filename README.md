@@ -1,18 +1,3 @@
-# v0.1.35.1 — Remove replacement entrance gap covers (based on v0.1.35)
-
-This is a narrow cleanup of the exact **Greyhaven Motion v0.1.35 NoRectangle-OpaqueOutlines (1)** upload.
-
-- The **v0.1.11 upper bridge/gap-cover** is no longer present in v0.1.35; it had already been removed in earlier rebuilds.
-- The remaining two skin-colored replacement covers (`drawEntranceSkinCovers`) were removed entirely, including their invocation in the non-X-ray draw pass.
-- The separate **depth-based shaft clip**, torso skin cover, **under-rim/depth drawing**, **opaque Y/fold outlines**, original thighs, X-ray internals and simulation systems were left unchanged.
-
-**Important:** This removes the replacement gap-cover artwork, but it does not remove the shaft itself or the rim. Any remaining tan, dark-outlined rectangular shape may come from the shaft geometry and requires a separate identified fix. This patch intentionally does not alter that geometry.
-
-## Testing
-Run `node tests/v0351-gap-cover-removal.mjs` and the existing tests under `tests/`.
-
----
-
 # v0.1.35 — Torso bottom shadow and opaque Y-line micro-fix
 
 This update intentionally changes only two rendering details.

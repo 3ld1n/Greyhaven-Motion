@@ -308,56 +308,9 @@ export function createMissionaryRenderer(canvas) {
         const lineFade = Math.max(0, Math.min(1, 1 - lipsOpen * 2.0));
         const rimReveal = Math.max(0, Math.min(1, (lipsOpen - 0.04) / 0.36));
 
-        function drawEntranceDepthUnder() {
-            // Underlying opening anatomy. This sits beneath the fold covers and
-            // the shaft. Keep the reveal connected under the rim, but avoid the
-            // old transparent rectangle/triangle look.
-            const reveal = hasMadeContact ? rimReveal : 0;
-            if (reveal <= 0.01) return;
-
-            const ovalHalf = 0.40 + reveal * 1.10;
-            const ovalCy = E.y - 1.02;
-            const ovalRy = 0.60 + reveal * 1.22;
-            const rimHalf = 0.78 + reveal * 1.08;
-            const rimY = E.y + 0.68;
-            const slotHalf = 0.34 + reveal * 0.74;
-            const slotY = E.y + 1.08;
-            const depthHalf = 0.34 + reveal * 0.44;
-            const depthBottomY = E.y + 2.65;
-
-            // Revealed upper oval opening.
-            ctx.beginPath();
-            ctx.ellipse(E.x, ovalCy, ovalHalf, ovalRy, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(226,188,197,${0.16 + reveal * 0.14})`;
-            ctx.fill();
-
-            // Opaque rim directly above the depth opening.
-            ctx.beginPath();
-            ctx.moveTo(E.x - rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.34, E.y + 0.00, E.x, E.y - 0.22);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.34, E.y + 0.00, E.x + rimHalf, rimY);
-            ctx.quadraticCurveTo(E.x + rimHalf * 0.46, E.y + 0.94, E.x, E.y + 1.18);
-            ctx.quadraticCurveTo(E.x - rimHalf * 0.46, E.y + 0.94, E.x - rimHalf, rimY);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(145, 89, 110, ${0.44 + reveal * 0.22})`;
-            ctx.fill();
-
-            // Slot/dark opening connected immediately under the rim.
-            ctx.beginPath();
-            ctx.ellipse(E.x, slotY, slotHalf, 0.16 + reveal * 0.18, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(84, 34, 50, ${0.34 + reveal * 0.24})`;
-            ctx.fill();
-
-            // Keep only a tiny connected depth notch under the slot so the old
-            // pale rectangle/block is gone.
-            ctx.beginPath();
-            ctx.moveTo(E.x - (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.quadraticCurveTo(E.x, E.y + 1.56, E.x + (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.quadraticCurveTo(E.x, E.y + 1.88, E.x - (0.10 + reveal * 0.08), slotY + 0.10);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(107, 60, 74, ${0.08 + reveal * 0.08})`;
-            ctx.fill();
-        }
+        // Entrance depth-under drawing removed intentionally.
+        // We will rebuild this layer from scratch later instead of keeping the
+        // current oval/rim/depth artifact renderer.
 
         function drawBodyAttachedBorders() {
             // Fixed body-attached contours. Slightly curved and tucked behind the
@@ -380,6 +333,34 @@ export function createMissionaryRenderer(canvas) {
                 ctx.stroke();
             }
             ctx.restore();
+        }
+
+        function drawEntranceSkinCovers() {
+            // Two narrow body-connected fold covers that stay closed at rest,
+            // then part open on contact. No rectangular skin mask.
+            const reveal = hasMadeContact ? rimReveal : 0;
+            const shoulderY = E.y - 3.86;
+            const baseY = E.y + 1.12;
+            const innerGap = 0.05 + reveal * 1.10;
+            const innerMid = 0.34 + reveal * 0.34;
+            const outerMid = 0.74 + reveal * 0.74;
+            const outerBase = 1.16 + reveal * 0.94;
+            const shoulderWidth = 0.64 + reveal * 0.24;
+            for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(E.x + side * 0.03, shoulderY + 0.04);
+                ctx.quadraticCurveTo(E.x + side * 0.14, E.y - 2.12,
+                    E.x + side * innerMid, E.y - 0.76);
+                ctx.quadraticCurveTo(E.x + side * outerMid, E.y + 0.08,
+                    E.x + side * innerGap, baseY);
+                ctx.quadraticCurveTo(E.x + side * outerBase, E.y + 0.98,
+                    E.x + side * (shoulderWidth + outerMid * 0.32), shoulderY + 0.54);
+                ctx.quadraticCurveTo(E.x + side * shoulderWidth, shoulderY - 0.06,
+                    E.x + side * 0.03, shoulderY + 0.04);
+                ctx.closePath();
+                ctx.fillStyle = PAL.skin;
+                ctx.fill();
+            }
         }
 
         function drawEntranceOverlay() {
@@ -821,12 +802,6 @@ export function createMissionaryRenderer(canvas) {
         }
         ctx.restore(); // end body/jiggle layer
 
-        // Local entrance depth opening sits beneath the shaft in both views.
-        ctx.save();
-        ctx.translate(pelvisSway, pelvisBounce);
-        drawEntranceDepthUnder();
-        ctx.restore();
-
         // ==================== shaft layer (no jiggle) ====================
         // Puddle on the sheet below (grows with everything that has leaked out)
         if (puddle > 0.02) {
@@ -988,9 +963,9 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Gap-cover experiment removed (v0.1.35.1). The existing non-X-ray
-            // occlusion clip above still hides the internal shaft at depth;
-            // no added skin polygon is painted over the entrance here.
+            // Body-connected fold covers replace the former one-piece
+            // skin rectangle. They stay closed at rest and part on contact.
+            drawEntranceSkinCovers();
 
             // Redraw the navel above the non-xray cover so it never gets washed out.
             ctx.beginPath();
