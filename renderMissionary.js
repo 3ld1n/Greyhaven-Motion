@@ -382,34 +382,6 @@ export function createMissionaryRenderer(canvas) {
             ctx.restore();
         }
 
-        function drawEntranceSkinCovers() {
-            // Two narrow body-connected fold covers that stay closed at rest,
-            // then part open on contact. No rectangular skin mask.
-            const reveal = hasMadeContact ? rimReveal : 0;
-            const shoulderY = E.y - 3.86;
-            const baseY = E.y + 1.12;
-            const innerGap = 0.05 + reveal * 1.10;
-            const innerMid = 0.34 + reveal * 0.34;
-            const outerMid = 0.74 + reveal * 0.74;
-            const outerBase = 1.16 + reveal * 0.94;
-            const shoulderWidth = 0.64 + reveal * 0.24;
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(E.x + side * 0.03, shoulderY + 0.04);
-                ctx.quadraticCurveTo(E.x + side * 0.14, E.y - 2.12,
-                    E.x + side * innerMid, E.y - 0.76);
-                ctx.quadraticCurveTo(E.x + side * outerMid, E.y + 0.08,
-                    E.x + side * innerGap, baseY);
-                ctx.quadraticCurveTo(E.x + side * outerBase, E.y + 0.98,
-                    E.x + side * (shoulderWidth + outerMid * 0.32), shoulderY + 0.54);
-                ctx.quadraticCurveTo(E.x + side * shoulderWidth, shoulderY - 0.06,
-                    E.x + side * 0.03, shoulderY + 0.04);
-                ctx.closePath();
-                ctx.fillStyle = PAL.skin;
-                ctx.fill();
-            }
-        }
-
         function drawEntranceOverlay() {
             const reveal = hasMadeContact ? Math.max(0, Math.min(1, (lipsOpen - 0.02) / 0.80)) : 0;
             const yJunction = E.y - 3.94;
@@ -1016,9 +988,9 @@ export function createMissionaryRenderer(canvas) {
             ctx.lineWidth = 0.5;
             ctx.stroke();
 
-            // Body-connected fold covers replace the former one-piece
-            // skin rectangle. They stay closed at rest and part on contact.
-            drawEntranceSkinCovers();
+            // Gap-cover experiment removed (v0.1.35.1). The existing non-X-ray
+            // occlusion clip above still hides the internal shaft at depth;
+            // no added skin polygon is painted over the entrance here.
 
             // Redraw the navel above the non-xray cover so it never gets washed out.
             ctx.beginPath();
