@@ -1,17 +1,30 @@
-# Greyhaven Motion v0.1.28 — Sketch-Matched Fold Rebuild
+# Greyhaven Motion v0.1.29 — Clean Entrance Baseline
 
-## What changed
-- **Restarted from the stable v0.1.23 base:** the new patch intentionally rebuilds the local fold detail from the earlier stable package instead of layering more fixes on top of the later experiments.
-- **Sketch-matched closed and open states:** the fold detail is redrawn to follow the three user-provided guide sketches, including the larger outer fold contours, hidden rest-state rim, center Y line in the closed state, and the taller open-state central hood/inner crease treatment.
-- **No whole-group bounce scaling:** the fold system now morphs by moving individual local contour pieces instead of enlarging/shrinking the whole detail block as one layer.
-- **Hidden legacy rim on the normal surface view:** the old surface rim/bridge stroke is no longer redrawn over the external view, so the redesigned folds can fully cover that area. X-ray still keeps its entrance bridge/rim treatment.
-- **Local cleanup cover:** a narrow skin-colored cover is added only around the fold roots to hide legacy thigh-line remnants beneath the new detail, without intentionally covering the shaft.
+**Based directly on the user-supplied, working v0.1.23 ZIP.** This is deliberately a removal-only staging release; **the new fold illustration is not installed yet**.
 
-## Verification
-- All ten automated Node tests still pass, including the v0.1.23 regression suite.
-- Final artistic matching should still be checked in SillyTavern on the intended device, because the build environment could not run a full visual browser review.
+## Removed from the renderer
+- All old external fold shapes and their inner outlines, including the duplicate skin-colored oval/side occluder shapes.
+- The small pointed central fold insert and its old opening-dependent decoration.
+- The old visible rim stroke, entrance bridge decoration, and separate X-ray entrance rim/bridge overlay.
+- The previous dark external depth-shadow ellipse.
 
-**Installation:** back up the current extension, replace the files with this ZIP's root contents, reload SillyTavern, and press Reset for a clean visual check.
+## Preserved deliberately
+- **Approved body and thigh paths, including their off-screen continuation, exactly as supplied.** The thigh outline source segment has the same SHA-256 as the locked baseline.
+- **Existing penetration/shaft occlusion:** the moving-shaft edge clip and opaque skin cover still use the exact same edge geometry. These are not the decorative rim and must remain until the new fold system is integrated.
+- The X-ray belly window and its internal canal/womb illustration (only the redundant *external* rim was removed).
+- Shaft/protection/tear rendering, response waves, squirt droplets, wetness, blood, pre-fluid, event counters/summaries, automatic motion, and the 60/120 Hz physics setting.
+- `sim.js`, `index.js`, `style.css`, `skins.js`, `eventManager.js`, and `responseWave.js` were verified byte-for-byte unchanged from the uploaded v0.1.23 ZIP.
+
+## Expected appearance and future work
+The entrance area will **look intentionally plain/unfinished** until the replacement illustrations are added. The existing seam and triangular gap formed by the original thigh outlines can still be visible because those outlines are preserved; this patch does not redraw the thighs or introduce a new mask.
+
+In the next release, insert the new fold/rim/depth artwork at the `clean entrance canvas area` marker in `renderMissionary.js`, carefully placing the under-shaft depth layer before the moving-shaft layer and the surface contours after it. The shaft occlusion path should remain independent of the decorative entrance shapes.
+
+## Tests and installation
+- All **11 Node regression suites** passed, including `tests/v029-clean-entrance.mjs`, which exercises both X-ray and external rendering with movement and an active squirt effect.
+- The ZIP was integrity-checked. A true phone-browser visual screenshot was not available in this environment, so final visual appearance still needs checking in SillyTavern.
+
+Back up your current extension, replace its files with the ZIP contents (files at ZIP root), reload SillyTavern, then press Reset for a clean test scene.
 
 ---
 

@@ -287,57 +287,10 @@ export function createMissionaryRenderer(canvas) {
             const t = -1 + 2 * i / 36;
             edgePoints.push({ x: E.x + edgeW * t, y: edgeY - edgeH * Math.sqrt(Math.max(0, 1 - t * t)) });
         }
-        function traceEdge() {
-            ctx.moveTo(edgePoints[0].x, edgePoints[0].y);
-            for (let i = 1; i < edgePoints.length; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
-        }
-        function traceVisibleRim() {
-            const start = 3, end = edgePoints.length - 4;
-            ctx.moveTo(edgePoints[start].x, edgePoints[start].y);
-            for (let i = start + 1; i <= end; i++) ctx.lineTo(edgePoints[i].x, edgePoints[i].y);
-        }
-        function drawEntranceBridge() {
-            const bridgeTopY = edgeY - edgeH - 0.98;
-            const bridgeBottomY = edgeY - edgeH + 0.10;
-            const bridgeOuterY = edgeY - 0.08;
-            ctx.beginPath();
-            ctx.moveTo(E.x - edgeW - 0.28, bridgeOuterY);
-            ctx.quadraticCurveTo(E.x - edgeW * 0.82, bridgeTopY + 0.16, E.x, bridgeTopY - 0.16);
-            ctx.quadraticCurveTo(E.x + edgeW * 0.82, bridgeTopY + 0.16, E.x + edgeW + 0.28, bridgeOuterY);
-            ctx.lineTo(E.x + edgeW * 0.70, bridgeBottomY);
-            ctx.quadraticCurveTo(E.x, bridgeBottomY - 0.10, E.x - edgeW * 0.70, bridgeBottomY);
-            ctx.closePath();
-            ctx.fillStyle = PAL.skin;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(E.x - edgeW * 0.64, edgeY - edgeH + 0.08);
-            ctx.quadraticCurveTo(E.x, edgeY - edgeH - 0.18, E.x + edgeW * 0.64, edgeY - edgeH + 0.08);
-            ctx.lineTo(E.x + edgeW * 0.46, edgeY - edgeH + 0.62);
-            ctx.quadraticCurveTo(E.x, edgeY - edgeH + 0.42, E.x - edgeW * 0.46, edgeY - edgeH + 0.62);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(145, 92, 108, 0.18)';
-            ctx.fill();
-        }
-        function drawEntranceRim() {
-            ctx.beginPath();
-            traceVisibleRim();
-            ctx.strokeStyle = 'rgba(176, 124, 114, 0.98)';
-            ctx.lineWidth = 1.24;
-            ctx.stroke();
-        }
-        function drawRimSideOccluders() {
-            for (const sign of [1, -1]) {
-                const gap = sign === 1 ? st0.gapT : st0.gapB;
-                const nn = { x: n0.x * sign, y: n0.y * sign };
-                const contraction = Math.min(0.92, (s.response?.strength || 0) * 0.90);
-                const cx = E.x + nn.x * (gap + 0.78 - contraction) + out.x * 0.44;
-                const cy = E.y + nn.y * (gap + 0.78 - contraction) + out.y * 0.44;
-                ctx.beginPath();
-                ctx.ellipse(cx, cy, 1.05, 2.05, sign * 0.22, 0, Math.PI * 2);
-                ctx.fillStyle = PAL.skin;
-                ctx.fill();
-            }
-        }
+        // ENTRANCE CLEANUP (v0.1.29): edgePoints are preserved ONLY for the
+        // invisible-shaft clip and opaque skin cover. The old rim, bridge,
+        // oval side occluders and fold drawing helpers have been removed.
+        // Future entrance visuals will live in a new isolated renderer.
 
         // ==================== body layer (gets the jiggle wobble) ====================
         ctx.save();
@@ -669,7 +622,6 @@ export function createMissionaryRenderer(canvas) {
         ctx.restore(); // end window clip
         } else {
             const press = Math.min(1, Math.max(0, s.depthNorm || 0));
-            const contactOpen = Math.max(0, Math.min(1, motionContact * 1.15));
             ctx.save();
             torsoPath(belly);
             ctx.clip();
@@ -692,18 +644,8 @@ export function createMissionaryRenderer(canvas) {
             ctx.fillStyle = `rgba(255,255,255,${0.05 + press * 0.05})`;
             ctx.fill();
 
-            // Opening underlay: hidden before first contact, then it stays visible.
-            // Keep only the darker depth shape so no pale/tan line appears under the rim.
-            const openW = 2.10 + openingSpread * 2.05;
-            const openH = 0.92 + openingSpread * 0.96;
-            const openY = E.y + 2.02;
-            const shownOpen = hasMadeContact ? Math.max(contactOpen, 0.18) : 0;
-            if (shownOpen > 0.06) {
-                ctx.beginPath();
-                ctx.ellipse(E.x, openY + 0.08, Math.max(0.96, openW * 0.82), Math.max(0.66, openH * 0.88), 0, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(78, 36, 48, ${0.22 + shownOpen * 0.30})`;
-                ctx.fill();
-            }
+            // Entrance depth shadow removed for the upcoming redesign.
+            // This torso shading block is otherwise unchanged.
             ctx.restore();
         }
         ctx.restore(); // end body/jiggle layer
@@ -883,9 +825,8 @@ export function createMissionaryRenderer(canvas) {
                 ctx.fillStyle = PAL.skin;
                 ctx.fill();
 
-                // Surface entrance detail is now fully handled by the custom fold
-                // morph below. Do not redraw the old bridge/rim here or the rim
-                // becomes visible above the redesigned folds.
+                // The opaque edge-aligned cover above is intentionally KEPT.
+                // Old bridge/rim decoration is removed for the new entrance art.
             }
 
             // Redraw the navel above the non-xray cover so it never gets washed out.
@@ -993,181 +934,15 @@ export function createMissionaryRenderer(canvas) {
             ctx.fill();
         }
 
-        // Keep the entrance depth/cover visible in X-ray even at zero depth.
-        // Previously hasMadeContact suppressed it and the cutaway appeared to
-        // lose its rim and depth shapes until the next insertion.
-        ctx.save();
-        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-        drawEntranceBridge();
-        drawEntranceRim();
-        ctx.restore();
+        // The old external entrance bridge/rim is intentionally omitted.
+        // The X-ray oval, interior canal, and simulator remain unchanged.
 
         }
 
-
-        // ==================== local fold redesign ====================
-        // Rebuilt to follow the user-provided sketches more closely:
-        // - closed rest state with a center Y line and no visible rim
-        // - open stroked state around the shaft without whole-layer scaling
-        // - the under-rim depth shape stays under the shaft while the upper
-        //   fold contours sit above it.
-        ctx.save();
-        ctx.translate(pelvisSway * 0.8, pelvisBounce * 0.85);
-
-        const clamp01 = (v) => Math.max(0, Math.min(1, v));
-        const lerp = (a, b, t) => a + (b - a) * t;
-        const smooth01 = (v) => {
-            v = clamp01(v);
-            return v * v * (3 - 2 * v);
-        };
-
-        const responseStrength = Math.max(0, s.response?.strength || 0);
-        const contactMemory = hasMadeContact ? 0.16 : 0.0;
-        const insertDrive = s.inside ? Math.min(1, 0.70 + (s.depthNorm || 0) * 0.55) : 0.0;
-        const motionDrive = Math.min(1, openingSpread * 1.08 + motionVel * 0.14);
-        const baseOpen = Math.max(contactMemory, insertDrive, motionDrive * (hasMadeContact ? 0.36 : 0.0));
-        const pulseHold = s.response?.hold ? 1 : (0.72 + 0.28 * Math.cos((s.response?.elapsed || 0) * 14));
-        const contraction = responseStrength * pulseHold;
-        const openRaw = clamp01(baseOpen - contraction * 0.16);
-        const openT = smooth01(openRaw);
-        const closedT = 1 - openT;
-        const centerX = E.x;
-        const centerY = E.y - 0.06;
-        const foldBaseY = edgeY - edgeH - 0.22;
-
-        // Cover only the legacy thigh-edge remnants under the new local fold area.
-        ctx.beginPath();
-        ctx.moveTo(centerX - 3.05, foldBaseY + 0.42);
-        ctx.quadraticCurveTo(centerX - 1.95, foldBaseY - 0.38, centerX - 1.22, foldBaseY - 0.12);
-        ctx.quadraticCurveTo(centerX - 0.56, foldBaseY + 0.14, centerX - 0.16, foldBaseY + 0.72);
-        ctx.lineTo(centerX + 0.16, foldBaseY + 0.72);
-        ctx.quadraticCurveTo(centerX + 0.56, foldBaseY + 0.14, centerX + 1.22, foldBaseY - 0.12);
-        ctx.quadraticCurveTo(centerX + 1.95, foldBaseY - 0.38, centerX + 3.05, foldBaseY + 0.42);
-        ctx.lineTo(centerX + 2.50, foldBaseY + 0.98);
-        ctx.quadraticCurveTo(centerX + 1.00, foldBaseY + 0.22, centerX, foldBaseY + 0.14);
-        ctx.quadraticCurveTo(centerX - 1.00, foldBaseY + 0.22, centerX - 2.50, foldBaseY + 0.98);
-        ctx.closePath();
-        ctx.fillStyle = PAL.skin;
-        ctx.fill();
-
-        // Under-rim/depth wedge. Always drawn under the shaft/folds, following
-        // the sketch triangle while staying slightly smaller than the original.
-        const wedgeTopY = foldBaseY + 0.16;
-        const wedgeBottomY = foldBaseY + 2.12;
-        const wedgeHalfTop = lerp(0.36, 0.86, openT);
-        const wedgeHalfBottom = lerp(1.20, 1.62, openT);
-        ctx.beginPath();
-        ctx.moveTo(centerX, wedgeTopY);
-        ctx.lineTo(centerX + wedgeHalfBottom, wedgeBottomY);
-        ctx.lineTo(centerX - wedgeHalfBottom, wedgeBottomY);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(247, 223, 216, 0.95)';
-        ctx.fill();
-
-        // Soft depth shadow inside the wedge, stronger in the open state.
-        const depthAlpha = 0.14 + openT * 0.24;
-        ctx.beginPath();
-        ctx.moveTo(centerX, wedgeTopY + 0.12);
-        ctx.lineTo(centerX + wedgeHalfTop, wedgeTopY + 0.62 + openT * 0.36);
-        ctx.lineTo(centerX, wedgeTopY + 1.06 + openT * 1.00);
-        ctx.lineTo(centerX - wedgeHalfTop, wedgeTopY + 0.62 + openT * 0.36);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(145, 92, 108, ${depthAlpha})`;
-        ctx.fill();
-
-        // Closed-state center Y line.
-        if (closedT > 0.02) {
-            const alpha = clamp01((closedT - 0.10) / 0.90);
-            const yTop = foldBaseY - 3.98;
-            const yBase = foldBaseY + 0.16;
-            ctx.beginPath();
-            ctx.moveTo(centerX, yTop + 0.30);
-            ctx.lineTo(centerX - 0.36, yTop);
-            ctx.moveTo(centerX, yTop + 0.30);
-            ctx.lineTo(centerX + 0.36, yTop);
-            ctx.moveTo(centerX, yTop + 0.22);
-            ctx.lineTo(centerX, yBase);
-            ctx.strokeStyle = `rgba(199, 138, 150, ${0.62 * alpha})`;
-            ctx.lineCap = 'round';
-            ctx.lineWidth = 0.36;
-            ctx.stroke();
-        }
-
-        // Open-state central hood / inner lips above the shaft.
-        if (openT > 0.03) {
-            const hoodTopY = lerp(foldBaseY - 0.26, foldBaseY - 3.85, openT);
-            const hoodSideY = lerp(foldBaseY - 0.04, foldBaseY - 0.48, openT);
-            const hoodHalf = lerp(0.24, 1.10, openT);
-            ctx.beginPath();
-            ctx.moveTo(centerX, hoodTopY);
-            ctx.bezierCurveTo(centerX + hoodHalf * 0.44, hoodTopY + 0.22,
-                centerX + hoodHalf * 0.90, hoodTopY + 1.14,
-                centerX + hoodHalf * 0.96, hoodSideY + 0.30);
-            ctx.quadraticCurveTo(centerX + hoodHalf * 0.84, hoodSideY + 1.24,
-                centerX + hoodHalf * 0.36, hoodSideY + 1.88);
-            ctx.lineTo(centerX - hoodHalf * 0.36, hoodSideY + 1.88);
-            ctx.quadraticCurveTo(centerX - hoodHalf * 0.84, hoodSideY + 1.24,
-                centerX - hoodHalf * 0.96, hoodSideY + 0.30);
-            ctx.bezierCurveTo(centerX - hoodHalf * 0.90, hoodTopY + 1.14,
-                centerX - hoodHalf * 0.44, hoodTopY + 0.22,
-                centerX, hoodTopY);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(246, 210, 205, ${0.34 + openT * 0.34})`;
-            ctx.fill();
-
-            // Darker under-rim band beneath the central hood, under the shaft.
-            ctx.beginPath();
-            ctx.ellipse(centerX, foldBaseY + 0.95, 0.54 + openT * 0.94, 0.18 + openT * 0.28, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(105, 54, 63, ${0.10 + openT * 0.26})`;
-            ctx.fill();
-
-            // Two inner light creases visible only when open.
-            for (const sign of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(centerX + sign * lerp(0.10, 0.74, openT), foldBaseY + 0.22);
-                ctx.bezierCurveTo(centerX + sign * lerp(0.22, 0.54, openT), foldBaseY - 0.82,
-                    centerX + sign * lerp(0.26, 0.82, openT), foldBaseY - 2.06,
-                    centerX + sign * lerp(0.18, 0.58, openT), foldBaseY - 3.14);
-                ctx.strokeStyle = `rgba(230, 197, 193, ${0.26 + openT * 0.44})`;
-                ctx.lineWidth = 0.32;
-                ctx.lineCap = 'round';
-                ctx.stroke();
-            }
-        }
-
-        // Outer fold contours. They morph between the closed sketch and the
-        // wider open sketch without scaling the whole detail group.
-        for (const sign of [-1, 1]) {
-            const tipX = centerX + sign * lerp(2.10, 5.00, openT);
-            const tipY = lerp(foldBaseY - 4.10, foldBaseY - 4.55, openT);
-            const midX = centerX + sign * lerp(1.28, 2.34, openT);
-            const midY = lerp(foldBaseY - 2.72, foldBaseY - 1.80, openT);
-            const footX = centerX + sign * lerp(0.42, 1.18, openT);
-            const footY = lerp(foldBaseY + 0.12, foldBaseY + 1.24, openT);
-            ctx.beginPath();
-            ctx.moveTo(tipX, tipY);
-            ctx.bezierCurveTo(centerX + sign * lerp(1.86, 3.18, openT), lerp(foldBaseY - 3.48, foldBaseY - 3.66, openT),
-                midX, midY,
-                footX, footY);
-            ctx.strokeStyle = PAL.skinLine;
-            ctx.lineWidth = 0.78;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
-        }
-
-        // Small soft fold pads at the root, above the depth wedge.
-        const padAlpha = 0.22 + openT * 0.40;
-        for (const sign of [-1, 1]) {
-            ctx.beginPath();
-            ctx.ellipse(centerX + sign * lerp(0.48, 1.44, openT),
-                lerp(foldBaseY + 0.14, foldBaseY + 0.58, openT),
-                lerp(0.18, 0.70, openT), lerp(0.14, 0.30, openT), sign * 0.12, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(200, 147, 155, ${padAlpha})`;
-            ctx.fill();
-        }
-
-        ctx.restore();
+        // ==================== clean entrance canvas area ====================
+        // Deliberately no fold, rim, depth opening, or added skin mask here.
+        // Upcoming artwork will be built independently from the user's sketches.
+        // The approved thighs and the shaft-occlusion geometry above are preserved.
 
         // Intentionally NO separate external tear overlay: the true tip tear
         // is already rendered in the shaft layer and occluded by the normal
@@ -1255,6 +1030,9 @@ export function createMissionaryRenderer(canvas) {
         // Decorative spray for the optional stronger response. It originates
         // directly under the rim, opens slightly upward/outward, then falls.
         const sprayActive = !!s.response?.spray;
+        // Keep the response intensity for the existing spray effect independently
+        // of the removed fold renderer (which used to define this value).
+        const responseStrength = Math.max(0, s.response?.strength || 0);
         const spraySourceX = E.x + pelvisSway * 0.8;
         const spraySourceY = edgeY - edgeH + 0.62 + pelvisBounce * 0.85;
         if (sprayActive) {
