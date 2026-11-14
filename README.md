@@ -1,3 +1,27 @@
+# Greyhaven Motion v0.1.32 — Fold Cover Reveal Pass
+
+**Built on v0.1.31 and focused on the new surface entrance behavior.** This pass restructures the local entrance artwork so the closed Y-shape remains the resting pose while the opening is revealed by two body-connected fold covers, instead of the old fade between separate drawings.
+
+## Updated in this release
+- Replaced the one-piece entrance skin cover with **two fold-cover layers** that stay closed at rest and part on contact.
+- Kept the **central Y detail** as the resting-state core, then extended/split its lower branches into the opening-side contours during contact.
+- Rebuilt the **surface opening underlayer** so the revealed oval, the opaque rim, and the connected depth opening are drawn as one stack beneath the fold covers.
+- Removed the former **transparent upside-down triangle** behavior and the visible **skin-colored rectangle block** at the entrance.
+- Reworked the fixed body-attached inner borders to stay slightly curved and detached from shaft motion.
+
+## Intended visual result
+- At 0 thrusts, the entrance should stay in the **contracted Y state**.
+- The folds should **not begin moving before first contact**.
+- When contact begins, the fold covers should open apart and reveal the underlying oval/rim rather than swapping by fade.
+- The depth opening should sit **directly beneath the rim** and remain visually tucked under the folds.
+- The thigh/body contours should not draw on top of the shaft or the revealed depth.
+
+## Notes
+- X-ray internals and the general simulator logic are preserved.
+- Final visual review is still needed inside SillyTavern on the phone, because this environment cannot provide a trustworthy on-device screenshot review.
+
+---
+
 # Greyhaven Motion v0.1.29 — Clean Entrance Baseline
 
 **Based directly on the user-supplied, working v0.1.23 ZIP.** This is deliberately a removal-only staging release; **the new fold illustration is not installed yet**.
